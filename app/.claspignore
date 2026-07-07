@@ -1,0 +1,14 @@
+# Ignore all files
+**/**
+
+# Except:
+!appsscript.json
+!**/*.gs
+!**/*.js
+!**/*.html
+
+# Ignore even valid files if in:
+.git/**
+node_modules/**
+.vscode/**
+.venv/**
