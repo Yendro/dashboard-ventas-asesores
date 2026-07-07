@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Caches & Temporary Files
+.npm/
+.eslintcache
+.cache/
+.tmp/
+temp/
+__pycache__/
+
+# Build & Coverage
+dist/
+build/
+output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables & Local Context
+.env
+.env.*
+.venv
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editors
+.vscode/
+.idea/
+
+# Clasp local configs & credentials
+.clasprc.json
+.clasp.json
