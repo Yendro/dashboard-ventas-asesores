@@ -1,0 +1,72 @@
+<script>
+  // Paleta extraída de tu diseño (Coral, blanco, grises)
+  const temaGraficos = ["#eb6c61", "#ffffff", "#cccccc", "#f0a39e", "#a3a3a3"];
+
+  // Variables globales para las instancias de ECharts
+  let myCharts = [];
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // 1. Inicializar instancias en los contenedores
+    const chartVentasMeses = echarts.init(
+      document.getElementById("chart-ventas-meses"),
+    );
+    const chartDesarrollo = echarts.init(
+      document.getElementById("chart-desarrollo"),
+    );
+    const chartMarcas = echarts.init(document.getElementById("chart-marcas"));
+    // (Iniciaremos los demás después de estructurar los datos)
+
+    myCharts.push(chartVentasMeses, chartDesarrollo, chartMarcas);
+
+    // 2. Ejemplo Rápido: Gráfico de Ventas por Mes (Gráfico de Barras Coral)
+    const optionVentasMeses = {
+      color: ["#eb6c61"],
+      tooltip: { trigger: "axis" },
+      grid: { top: 10, right: 10, bottom: 25, left: 50 },
+      xAxis: {
+        type: "category",
+        data: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep"],
+        axisLabel: { color: "#a0a0a0" },
+        axisLine: { show: false },
+      },
+      yAxis: {
+        type: "value",
+        splitLine: { show: false }, // Sin líneas horizontales como en tu imagen
+        axisLabel: { show: false },
+      },
+      series: [
+        {
+          data: [120, 200, 350, 250, 150, 220, 200, 380, 160], // Dummy temporal
+          type: "bar",
+          barWidth: "70%",
+        },
+      ],
+    };
+    chartVentasMeses.setOption(optionVentasMeses);
+
+    // 3. Ejemplo Rápido: Gráfico de Pastel (Distribución por Marca)
+    const optionMarcas = {
+      color: ["#eb6c61", "#f0a39e", "#cf5d53"],
+      tooltip: { trigger: "item" },
+      series: [
+        {
+          type: "pie",
+          radius: ["0%", "70%"], // No es dona en tu imagen, es pastel cerrado
+          label: { color: "#fff" },
+          data: [
+            { value: 1048, name: "Almaviva" },
+            { value: 735, name: "Terraviva" },
+            { value: 580, name: "CO-IN" },
+          ], // Dummy temporal
+        },
+      ],
+    };
+    chartMarcas.setOption(optionMarcas);
+
+    // 4. CRÍTICO: Responsividad sin scroll.
+    // Obliga a todos los gráficos a recalcular su tamaño cuando el iframe/ventana cambie.
+    window.addEventListener("resize", () => {
+      myCharts.forEach((chart) => chart.resize());
+    });
+  });
+</script>

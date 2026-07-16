@@ -1,0 +1,101 @@
+<style>
+  :root {
+    --bg-dark: #2b2b2b;
+    --card-bg: #3d3d3d;
+    --text-main: #ffffff;
+    --text-muted: #a0a0a0;
+    --accent: #eb6c61; /* Color coral de la imagen */
+  }
+
+  body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow: hidden; /* Elimina el scroll del navegador */
+  }
+
+  /* Ajustar al 100% de la ventana */
+  #app-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 15px 25px;
+    box-sizing: border-box;
+  }
+
+  /* Cabecera */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Evita que la cabecera se aplaste */
+    margin-bottom: 15px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+  }
+
+  /* Inputs temporales */
+  .date-filters input {
+    background: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 5px;
+    margin-left: 5px;
+  }
+
+  /* LA CUADRÍCULA MÁGICA */
+  .dashboard-grid {
+    flex-grow: 1; /* Toma todo el alto restante */
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto 1fr 1fr; /* Fila 1 adaptativa, Fila 2 y 3 se dividen 50/50 */
+    gap: 15px;
+    min-height: 0; /* Crítico para que ECharts no desborde el Grid */
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 6px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Spans de columnas */
+  .chart-span-2 {
+    grid-column: span 2;
+  }
+  .chart-span-1 {
+    grid-column: span 1;
+  }
+
+  /* Tipografía de Tarjetas */
+  .chart-title,
+  .kpi-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+  .kpi-value {
+    font-size: 2.2rem;
+    color: #fff;
+    padding-top: 5px;
+  }
+
+  /* Contenedores de Gráficos */
+  .echart-container {
+    flex-grow: 1; /* Hace que el div del gráfico tome el 100% de la tarjeta */
+    width: 100%;
+    min-height: 0;
+  }
+</style>
