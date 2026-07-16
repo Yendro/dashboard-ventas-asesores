@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Ventas</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+
+    <style>
+      /* VARIABLES Y RESET */
+      :root {
+        --bg-color: #f4f7f6;
+        --card-bg: #ffffff;
+        --primary: #2c3e50;
+        --accent: #3498db;
+        --text: #333333;
+        --border: #e0e0e0;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text);
+      }
+
+      /* LAYOUT PRINCIPAL */
+      #app-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .oculto {
+        display: none !important;
+      }
+
+      /* CABECERA Y NAVEGACIÓN */
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--border);
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: var(--primary);
+      }
+
+      nav button {
+        background-color: var(--card-bg);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 8px 16px;
+        margin-left: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+      }
+      nav button.activo,
+      nav button:hover {
+        background-color: var(--accent);
+        color: white;
+      }
+
+      /* GRID DEL DASHBOARD */
+      /* Se define una cuadrícula para ubicar las tarjetas y gráficos */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-gap: 20px;
+        grid-auto-rows: minmax(150px, auto);
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        padding: 15px;
+        border: 1px solid var(--border);
+      }
+
+      /* Asignación de espacios según la idea inicial */
+      .kpi-ventas {
+        grid-column: span 2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .kpi-unidades {
+        grid-column: span 2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .grafico-meses {
+        grid-column: span 2;
+        height: 350px;
+      }
+      .grafico-marcas {
+        grid-column: span 1;
+        height: 350px;
+      }
+      .grafico-no-finalizadas {
+        grid-column: span 1;
+        height: 350px;
+      }
+      .grafico-desarrollo {
+        grid-column: span 2;
+        height: 350px;
+      }
+      .grafico-estatus {
+        grid-column: span 2;
+        height: 350px;
+      }
+
+      /* ESTILOS GRID.JS OVERRIDES */
+      #contenedor-tabla {
+        background: var(--card-bg);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-container">
+      <header>
+        <h1>
+          Tablero de Resultados: <span id="nombre-asesor"><?= asesor ?></span>
+        </h1>
+        <nav>
+          <button id="btn-dashboard" class="activo">Ver Tablero</button>
+          <button id="btn-tabla">Ver Listado Detallado</button>
+        </nav>
+      </header>
+
+      <main>
+        <section id="vista-dashboard">
+          <div class="dashboard-grid">
+            <div class="card kpi-ventas" id="kpi-ventas-container">
+              <h3 style="margin: 0; color: #7f8c8d; font-size: 1rem">
+                Ventas Finalizadas
+              </h3>
+              <h2
+                id="kpi-ventas-val"
+                style="margin: 5px 0 0 0; font-size: 2rem; color: #27ae60"
+              >
+                $0.00
+              </h2>
+            </div>
+            <div class="card kpi-unidades" id="kpi-unidades-container">
+              <h3 style="margin: 0; color: #7f8c8d; font-size: 1rem">
+                Unidades Finalizadas
+              </h3>
+              <h2
+                id="kpi-unidades-val"
+                style="margin: 5px 0 0 0; font-size: 2rem; color: #2980b9"
+              >
+                0
+              </h2>
+            </div>
+
+            <div class="card grafico-meses" id="chart-ventas-meses"></div>
+            <div class="card grafico-marcas" id="chart-marcas"></div>
+            <div
+              class="card grafico-no-finalizadas"
+              id="chart-no-finalizadas"
+            ></div>
+            <div class="card grafico-desarrollo" id="chart-desarrollo"></div>
+            <div class="card grafico-estatus" id="chart-estatus"></div>
+          </div>
+        </section>
+
+        <section id="vista-tabla" class="oculto">
+          <div id="contenedor-tabla"></div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const ASESOR = "<?= asesor ?>";
+      const DATOS_AGRUPADOS = <?!= datosAgrupados ?>;
+      const DATOS_DESGLOSADOS = <?!= datosDesglosados ?>;
+    </script>
+
+    <script>
+      // Referencias al DOM
+      const btnDashboard = document.getElementById("btn-dashboard");
+      const btnTabla = document.getElementById("btn-tabla");
+      const vistaDashboard = document.getElementById("vista-dashboard");
+      const vistaTabla = document.getElementById("vista-tabla");
+
+      // Lógica de navegación
+      btnDashboard.addEventListener("click", () => {
+        vistaDashboard.classList.remove("oculto");
+        vistaTabla.classList.add("oculto");
+        btnDashboard.classList.add("activo");
+        btnTabla.classList.remove("activo");
+      });
+
+      btnTabla.addEventListener("click", () => {
+        vistaTabla.classList.remove("oculto");
+        vistaDashboard.classList.add("oculto");
+        btnTabla.classList.add("activo");
+        btnDashboard.classList.remove("activo");
+
+        // Renderizar tabla solo cuando se visita por primera vez para ahorrar recursos
+        if (!window.tablaRenderizada) {
+          renderizarTablaGridJs();
+          window.tablaRenderizada = true;
+        }
+      });
+
+      // Función placeholder para la tabla
+      function renderizarTablaGridJs() {
+        console.log("Inicializando Grid.js...");
+        // Aquí insertaremos la lógica de Grid.js pronto
+      }
+    </script>
+  </body>
+</html>
