@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from google.cloud import bigquery
 from google.oauth2 import service_account
-from config import GLOBAL_CONFIG, SQL_DIR
+from src.config import GLOBAL_CONFIG, DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class BigQueryClient:
     def __init__(self):
         self.credentials_path = Path(GLOBAL_CONFIG["BIGQUERY_CREDENTIALS_PATH"])
         self.project_id = GLOBAL_CONFIG["BIGQUERY_PROJECT_ID"]
-        self.sql_folder = SQL_DIR
+        self.sql_folder = DATA_DIR
         self.client: Optional[bigquery.Client] = None
         
     def conectar(self) -> None:

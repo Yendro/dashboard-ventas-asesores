@@ -3,7 +3,7 @@ from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from config import GLOBAL_CONFIG
+from src.config import GLOBAL_CONFIG
 
 logger = logging.getLogger(__name__)
 

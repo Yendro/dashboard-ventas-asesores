@@ -5,15 +5,12 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
-
 # Cargar variables de entorno inmediatamente
 load_dotenv()
 
-
 # Rutas base
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
-SQL_DIR = DATA_DIR / "src"
 OUTPUT_DIR = BASE_DIR / "output"
 LOGS_DIR = BASE_DIR / "logs"
 
