@@ -7,34 +7,83 @@
     "#b54b42",
   ];
 
-  // Utilidad para formatear números a moneda (MXN)
   const formateadorMoneda = new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: "MXN",
     maximumFractionDigits: 0,
   });
 
-  // Array para almacenar las instancias y aplicar responsividad
   let myCharts = [];
 
-  document.addEventListener("DOMContentLoaded", () => {
-    // --------------------------------------------------------
-    // 1. PROCESAMIENTO DE DATOS
-    // --------------------------------------------------------
-    let kpi = {
-      ventas: 0,
-      unidades: 0,
-      tuberia: 0,
-      tuberiaUnidades: 0,
-    };
+  // Variables para las instancias de ECharts
+  let chartVentasMeses,
+    chartMarcas,
+    chartDesarrollo,
+    chartArbol,
+    chartTuberiaMeses;
 
+  document.addEventListener("DOMContentLoaded", () => {
+    // Inicializar instancias
+    chartVentasMeses = echarts.init(
+      document.getElementById("chart-ventas-meses"),
+    );
+    chartArbol = echarts.init(document.getElementById("chart-arbol"));
+    chartDesarrollo = echarts.init(document.getElementById("chart-desarrollo"));
+    chartMarcas = echarts.init(document.getElementById("chart-marcas"));
+    chartTuberiaMeses = echarts.init(
+      document.getElementById("chart-tuberia-meses"),
+    );
+
+    myCharts.push(
+      chartVentasMeses,
+      chartArbol,
+      chartDesarrollo,
+      chartMarcas,
+      chartTuberiaMeses,
+    );
+
+    // Event Listeners para los filtros de fecha
+    document
+      .getElementById("fecha-inicio")
+      .addEventListener("change", renderizarDashboard);
+    document
+      .getElementById("fecha-fin")
+      .addEventListener("change", renderizarDashboard);
+
+    // Responsividad Automática
+    window.addEventListener("resize", () => {
+      myCharts.forEach((chart) => chart.resize());
+    });
+
+    // Renderizado Inicial
+    renderizarDashboard();
+  });
+
+  function renderizarDashboard() {
+    // 1. OBTENER FECHAS DEL DOM
+    const fInicio = document.getElementById("fecha-inicio").value; // Formato: "YYYY-MM-DD"
+    const fFin = document.getElementById("fecha-fin").value;
+
+    // 2. FILTRAR DATOS
+    const datosFiltrados = DATOS_AGRUPADOS.filter((fila) => {
+      // Extraemos solo la parte YYYY-MM-DD para una comparación limpia
+      const fechaFila = fila.FechaMesAnio.substring(0, 10);
+
+      if (fInicio && fechaFila < fInicio) return false;
+      if (fFin && fechaFila > fFin) return false;
+      return true;
+    });
+
+    // 3. INICIALIZAR ACUMULADORES
+    let kpi = { ventas: 0, unidades: 0, tuberia: 0, tuberiaUnidades: 0 };
     let resumen = {
       ventasPorMes: {},
+      tuberiaPorMes: {},
       ventasPorMarca: {},
       ventasPorDesarrollo: {},
+      arbol: {},
     };
 
-    // Meses cronológicos para ordenar el eje X
     const mesesOrden = [
       "ene",
       "feb",
@@ -49,15 +98,18 @@
       "nov",
       "dic",
     ];
-    mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
+    mesesOrden.forEach((m) => {
+      resumen.ventasPorMes[m] = 0;
+      resumen.tuberiaPorMes[m] = 0;
+    });
 
-    DATOS_AGRUPADOS.forEach((fila) => {
+    // 4. PROCESAR DATOS
+    datosFiltrados.forEach((fila) => {
       const precio = Number(fila.PrecioVenta) || 0;
       const unidades = Number(fila.Unidades) || 0;
       const marca = fila.Marca || "Sin Marca";
       const desarrollo = fila.Desarrollo || "Sin Desarrollo";
 
-      // Extraer el mes corto (ej. "ene") desde el formato ISO UTC
       const fechaObj = new Date(fila.FechaMesAnio);
       const mesCorto = fechaObj
         .toLocaleString("es-ES", { month: "short", timeZone: "UTC" })
@@ -67,10 +119,8 @@
       if (fila.Estatus === "Finalizado") {
         kpi.ventas += precio;
         kpi.unidades += unidades;
-
-        if (resumen.ventasPorMes[mesCorto] !== undefined) {
+        if (resumen.ventasPorMes[mesCorto] !== undefined)
           resumen.ventasPorMes[mesCorto] += precio;
-        }
         resumen.ventasPorMarca[marca] =
           (resumen.ventasPorMarca[marca] || 0) + precio;
         resumen.ventasPorDesarrollo[desarrollo] =
@@ -78,12 +128,19 @@
       } else if (fila.Estatus === "Proceso") {
         kpi.tuberia += precio;
         kpi.tuberiaUnidades += unidades;
+        if (resumen.tuberiaPorMes[mesCorto] !== undefined)
+          resumen.tuberiaPorMes[mesCorto] += precio;
+
+        // Construcción jerárquica para el árbol de tubería
+        if (!resumen.arbol[marca])
+          resumen.arbol[marca] = { total: 0, desarrollos: {} };
+        resumen.arbol[marca].total += precio;
+        resumen.arbol[marca].desarrollos[desarrollo] =
+          (resumen.arbol[marca].desarrollos[desarrollo] || 0) + precio;
       }
     });
 
-    // --------------------------------------------------------
-    // 2. ACTUALIZAR KPIs EN EL DOM
-    // --------------------------------------------------------
+    // 5. ACTUALIZAR DOM (KPIs)
     document.getElementById("kpi-ventas").innerText = formateadorMoneda.format(
       kpi.ventas,
     );
@@ -94,116 +151,183 @@
     document.getElementById("kpi-tuberia-unidades").innerText =
       kpi.tuberiaUnidades.toLocaleString("es-MX");
 
-    // --------------------------------------------------------
-    // 3. PREPARAR SERIES PARA ECHARTS
-    // --------------------------------------------------------
-    const mesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
+    // 6. PREPARAR DATA PARA GRÁFICOS
+    const ventasMesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
+    const tuberiaMesesData = mesesOrden.map((m) => resumen.tuberiaPorMes[m]);
 
     const marcasData = Object.keys(resumen.ventasPorMarca)
       .map((k) => ({ name: k, value: resumen.ventasPorMarca[k] }))
       .filter((i) => i.value > 0);
-
-    // Ordenar de menor a mayor para barras horizontales (la mayor queda arriba)
     const desarrolloData = Object.keys(resumen.ventasPorDesarrollo)
       .map((k) => ({ name: k, value: resumen.ventasPorDesarrollo[k] }))
       .filter((i) => i.value > 0)
       .sort((a, b) => a.value - b.value);
 
-    // --------------------------------------------------------
-    // 4. INICIALIZAR Y CONFIGURAR GRÁFICOS
-    // --------------------------------------------------------
-    const chartVentasMeses = echarts.init(
-      document.getElementById("chart-ventas-meses"),
+    // Formatear datos para el Árbol (Root -> Marcas -> Desarrollos)
+    const treeData = {
+      name: "Tubería",
+      children: Object.keys(resumen.arbol).map((marca) => ({
+        name: marca,
+        value: resumen.arbol[marca].total,
+        children: Object.keys(resumen.arbol[marca].desarrollos).map((des) => ({
+          name: des,
+          value: resumen.arbol[marca].desarrollos[des],
+        })),
+      })),
+    };
+
+    // 7. INYECTAR OPCIONES A ECHARTS
+    // Usamos (option, true) para forzar a ECharts a limpiar el gráfico anterior y aplicar el nuevo sin mezclar datos
+
+    chartVentasMeses.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          trigger: "axis",
+          formatter: (p) =>
+            `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
+        },
+        grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
+        xAxis: {
+          type: "category",
+          data: mesesOrden,
+          axisLabel: { color: "#a0a0a0" },
+          axisLine: { show: false },
+          axisTick: { show: false },
+        },
+        yAxis: {
+          type: "value",
+          splitLine: { show: false },
+          axisLabel: { show: false },
+        },
+        series: [{ data: ventasMesesData, type: "bar", barWidth: "70%" }],
+      },
+      true,
     );
-    const chartMarcas = echarts.init(document.getElementById("chart-marcas"));
-    const chartDesarrollo = echarts.init(
-      document.getElementById("chart-desarrollo"),
+
+    chartTuberiaMeses.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          trigger: "axis",
+          formatter: (p) =>
+            `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
+        },
+        grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
+        xAxis: {
+          type: "category",
+          data: mesesOrden,
+          axisLabel: { color: "#a0a0a0" },
+          axisLine: { show: false },
+          axisTick: { show: false },
+        },
+        yAxis: {
+          type: "value",
+          splitLine: { show: false },
+          axisLabel: { show: false },
+        },
+        series: [{ data: tuberiaMesesData, type: "bar", barWidth: "70%" }],
+      },
+      true,
     );
 
-    myCharts.push(chartVentasMeses, chartMarcas, chartDesarrollo);
-
-    // --- Gráfico: Ventas por Mes (Barras Verticales) ---
-    chartVentasMeses.setOption({
-      color: coloresDashboard,
-      tooltip: {
-        trigger: "axis",
-        formatter: (params) =>
-          `${params[0].name}: ${formateadorMoneda.format(params[0].value)}`,
-      },
-      grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
-      xAxis: {
-        type: "category",
-        data: mesesOrden,
-        axisLabel: { color: "#a0a0a0" },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      yAxis: {
-        type: "value",
-        splitLine: { show: false },
-        axisLabel: { show: false },
-      },
-      series: [{ data: mesesData, type: "bar", barWidth: "70%" }],
-    });
-
-    // --- Gráfico: Ventas por Marca (Pastel) ---
-    chartMarcas.setOption({
-      color: coloresDashboard,
-      tooltip: {
-        trigger: "item",
-        formatter: (params) =>
-          `${params.name}: ${formateadorMoneda.format(params.value)}<br/>(${params.percent}%)`,
-      },
-      series: [
-        {
-          type: "pie",
-          radius: "75%",
-          center: ["50%", "50%"],
-          label: { color: "#fff", formatter: "{b}\n{d}%" },
-          data: marcasData,
+    chartMarcas.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          trigger: "item",
+          formatter: (p) =>
+            `${p.name}: ${formateadorMoneda.format(p.value)}<br/>(${p.percent}%)`,
         },
-      ],
-    });
+        series: [
+          {
+            type: "pie",
+            radius: "75%",
+            center: ["50%", "50%"],
+            label: { color: "#fff", formatter: "{b}\n{d}%" },
+            data: marcasData,
+          },
+        ],
+      },
+      true,
+    );
 
-    // --- Gráfico: Ventas por Desarrollo (Barras Horizontales) ---
-    chartDesarrollo.setOption({
-      color: coloresDashboard,
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
-        formatter: (params) =>
-          `${params[0].name}: ${formateadorMoneda.format(params[0].value)}`,
-      },
-      grid: { top: 10, right: 20, bottom: 20, left: 10, containLabel: true },
-      xAxis: {
-        type: "value",
-        splitLine: { show: false },
-        axisLabel: { show: false },
-      },
-      yAxis: {
-        type: "category",
-        data: desarrolloData.map((d) => d.name),
-        axisLabel: {
-          color: "#a0a0a0",
-          // Truncar nombres muy largos para no romper el grid
-          formatter: (value) =>
-            value.length > 12 ? value.substring(0, 12) + "..." : value,
+    chartDesarrollo.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "shadow" },
+          formatter: (p) =>
+            `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
         },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      series: [
-        {
-          type: "bar",
-          data: desarrolloData.map((d) => d.value),
-          label: { show: false },
+        grid: { top: 10, right: 20, bottom: 20, left: 10, containLabel: true },
+        xAxis: {
+          type: "value",
+          splitLine: { show: false },
+          axisLabel: { show: false },
         },
-      ],
-    });
+        yAxis: {
+          type: "category",
+          data: desarrolloData.map((d) => d.name),
+          axisLabel: {
+            color: "#a0a0a0",
+            formatter: (v) => (v.length > 12 ? v.substring(0, 12) + "..." : v),
+          },
+          axisLine: { show: false },
+          axisTick: { show: false },
+        },
+        series: [
+          {
+            type: "bar",
+            data: desarrolloData.map((d) => d.value),
+            label: { show: false },
+          },
+        ],
+      },
+      true,
+    );
 
-    // --- Responsividad Automática ---
-    window.addEventListener("resize", () => {
-      myCharts.forEach((chart) => chart.resize());
-    });
-  });
+    chartArbol.setOption(
+      {
+        tooltip: {
+          trigger: "item",
+          triggerOn: "mousemove",
+          formatter: (p) =>
+            `${p.data.name}: ${formateadorMoneda.format(p.data.value)}`,
+        },
+        series: [
+          {
+            type: "tree",
+            data: [treeData],
+            top: "5%",
+            bottom: "5%",
+            left: "15%",
+            right: "25%",
+            symbolSize: 8,
+            itemStyle: { color: "#eb6c61", borderColor: "#eb6c61" },
+            label: {
+              position: "left",
+              verticalAlign: "middle",
+              align: "right",
+              color: "#fff",
+              fontSize: 11,
+            },
+            leaves: {
+              label: {
+                position: "right",
+                verticalAlign: "middle",
+                align: "left",
+                color: "#a0a0a0",
+              },
+            },
+            expandAndCollapse: true,
+            animationDuration: 550,
+            animationDurationUpdate: 750,
+          },
+        ],
+      },
+      true,
+    );
+  }
 </script>
