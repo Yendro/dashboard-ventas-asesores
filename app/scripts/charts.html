@@ -1,70 +1,207 @@
 <script>
-  // Paleta extraída de tu diseño (Coral, blanco, grises)
-  const temaGraficos = ["#eb6c61", "#ffffff", "#cccccc", "#f0a39e", "#a3a3a3"];
+  const coloresDashboard = [
+    "#eb6c61",
+    "#f0a39e",
+    "#cf5d53",
+    "#e0847b",
+    "#b54b42",
+  ];
 
-  // Variables globales para las instancias de ECharts
+  // Utilidad para formatear números a moneda (MXN)
+  const formateadorMoneda = new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  });
+
+  // Array para almacenar las instancias y aplicar responsividad
   let myCharts = [];
 
   document.addEventListener("DOMContentLoaded", () => {
-    // 1. Inicializar instancias en los contenedores
+    // --------------------------------------------------------
+    // 1. PROCESAMIENTO DE DATOS
+    // --------------------------------------------------------
+    let kpi = {
+      ventas: 0,
+      unidades: 0,
+      tuberia: 0,
+      tuberiaUnidades: 0,
+    };
+
+    let resumen = {
+      ventasPorMes: {},
+      ventasPorMarca: {},
+      ventasPorDesarrollo: {},
+    };
+
+    // Meses cronológicos para ordenar el eje X
+    const mesesOrden = [
+      "ene",
+      "feb",
+      "mar",
+      "abr",
+      "may",
+      "jun",
+      "jul",
+      "ago",
+      "sep",
+      "oct",
+      "nov",
+      "dic",
+    ];
+    mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
+
+    DATOS_AGRUPADOS.forEach((fila) => {
+      const precio = Number(fila.PrecioVenta) || 0;
+      const unidades = Number(fila.Unidades) || 0;
+      const marca = fila.Marca || "Sin Marca";
+      const desarrollo = fila.Desarrollo || "Sin Desarrollo";
+
+      // Extraer el mes corto (ej. "ene") desde el formato ISO UTC
+      const fechaObj = new Date(fila.FechaMesAnio);
+      const mesCorto = fechaObj
+        .toLocaleString("es-ES", { month: "short", timeZone: "UTC" })
+        .toLowerCase()
+        .replace(".", "");
+
+      if (fila.Estatus === "Finalizado") {
+        kpi.ventas += precio;
+        kpi.unidades += unidades;
+
+        if (resumen.ventasPorMes[mesCorto] !== undefined) {
+          resumen.ventasPorMes[mesCorto] += precio;
+        }
+        resumen.ventasPorMarca[marca] =
+          (resumen.ventasPorMarca[marca] || 0) + precio;
+        resumen.ventasPorDesarrollo[desarrollo] =
+          (resumen.ventasPorDesarrollo[desarrollo] || 0) + precio;
+      } else if (fila.Estatus === "Proceso") {
+        kpi.tuberia += precio;
+        kpi.tuberiaUnidades += unidades;
+      }
+    });
+
+    // --------------------------------------------------------
+    // 2. ACTUALIZAR KPIs EN EL DOM
+    // --------------------------------------------------------
+    document.getElementById("kpi-ventas").innerText = formateadorMoneda.format(
+      kpi.ventas,
+    );
+    document.getElementById("kpi-unidades").innerText =
+      kpi.unidades.toLocaleString("es-MX");
+    document.getElementById("kpi-tuberia-val").innerText =
+      formateadorMoneda.format(kpi.tuberia);
+    document.getElementById("kpi-tuberia-unidades").innerText =
+      kpi.tuberiaUnidades.toLocaleString("es-MX");
+
+    // --------------------------------------------------------
+    // 3. PREPARAR SERIES PARA ECHARTS
+    // --------------------------------------------------------
+    const mesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
+
+    const marcasData = Object.keys(resumen.ventasPorMarca)
+      .map((k) => ({ name: k, value: resumen.ventasPorMarca[k] }))
+      .filter((i) => i.value > 0);
+
+    // Ordenar de menor a mayor para barras horizontales (la mayor queda arriba)
+    const desarrolloData = Object.keys(resumen.ventasPorDesarrollo)
+      .map((k) => ({ name: k, value: resumen.ventasPorDesarrollo[k] }))
+      .filter((i) => i.value > 0)
+      .sort((a, b) => a.value - b.value);
+
+    // --------------------------------------------------------
+    // 4. INICIALIZAR Y CONFIGURAR GRÁFICOS
+    // --------------------------------------------------------
     const chartVentasMeses = echarts.init(
       document.getElementById("chart-ventas-meses"),
     );
+    const chartMarcas = echarts.init(document.getElementById("chart-marcas"));
     const chartDesarrollo = echarts.init(
       document.getElementById("chart-desarrollo"),
     );
-    const chartMarcas = echarts.init(document.getElementById("chart-marcas"));
-    // (Iniciaremos los demás después de estructurar los datos)
 
-    myCharts.push(chartVentasMeses, chartDesarrollo, chartMarcas);
+    myCharts.push(chartVentasMeses, chartMarcas, chartDesarrollo);
 
-    // 2. Ejemplo Rápido: Gráfico de Ventas por Mes (Gráfico de Barras Coral)
-    const optionVentasMeses = {
-      color: ["#eb6c61"],
-      tooltip: { trigger: "axis" },
-      grid: { top: 10, right: 10, bottom: 25, left: 50 },
+    // --- Gráfico: Ventas por Mes (Barras Verticales) ---
+    chartVentasMeses.setOption({
+      color: coloresDashboard,
+      tooltip: {
+        trigger: "axis",
+        formatter: (params) =>
+          `${params[0].name}: ${formateadorMoneda.format(params[0].value)}`,
+      },
+      grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
       xAxis: {
         type: "category",
-        data: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep"],
+        data: mesesOrden,
         axisLabel: { color: "#a0a0a0" },
         axisLine: { show: false },
+        axisTick: { show: false },
       },
       yAxis: {
         type: "value",
-        splitLine: { show: false }, // Sin líneas horizontales como en tu imagen
+        splitLine: { show: false },
         axisLabel: { show: false },
+      },
+      series: [{ data: mesesData, type: "bar", barWidth: "70%" }],
+    });
+
+    // --- Gráfico: Ventas por Marca (Pastel) ---
+    chartMarcas.setOption({
+      color: coloresDashboard,
+      tooltip: {
+        trigger: "item",
+        formatter: (params) =>
+          `${params.name}: ${formateadorMoneda.format(params.value)}<br/>(${params.percent}%)`,
       },
       series: [
         {
-          data: [120, 200, 350, 250, 150, 220, 200, 380, 160], // Dummy temporal
-          type: "bar",
-          barWidth: "70%",
+          type: "pie",
+          radius: "75%",
+          center: ["50%", "50%"],
+          label: { color: "#fff", formatter: "{b}\n{d}%" },
+          data: marcasData,
         },
       ],
-    };
-    chartVentasMeses.setOption(optionVentasMeses);
+    });
 
-    // 3. Ejemplo Rápido: Gráfico de Pastel (Distribución por Marca)
-    const optionMarcas = {
-      color: ["#eb6c61", "#f0a39e", "#cf5d53"],
-      tooltip: { trigger: "item" },
+    // --- Gráfico: Ventas por Desarrollo (Barras Horizontales) ---
+    chartDesarrollo.setOption({
+      color: coloresDashboard,
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: (params) =>
+          `${params[0].name}: ${formateadorMoneda.format(params[0].value)}`,
+      },
+      grid: { top: 10, right: 20, bottom: 20, left: 10, containLabel: true },
+      xAxis: {
+        type: "value",
+        splitLine: { show: false },
+        axisLabel: { show: false },
+      },
+      yAxis: {
+        type: "category",
+        data: desarrolloData.map((d) => d.name),
+        axisLabel: {
+          color: "#a0a0a0",
+          // Truncar nombres muy largos para no romper el grid
+          formatter: (value) =>
+            value.length > 12 ? value.substring(0, 12) + "..." : value,
+        },
+        axisLine: { show: false },
+        axisTick: { show: false },
+      },
       series: [
         {
-          type: "pie",
-          radius: ["0%", "70%"], // No es dona en tu imagen, es pastel cerrado
-          label: { color: "#fff" },
-          data: [
-            { value: 1048, name: "Almaviva" },
-            { value: 735, name: "Terraviva" },
-            { value: 580, name: "CO-IN" },
-          ], // Dummy temporal
+          type: "bar",
+          data: desarrolloData.map((d) => d.value),
+          label: { show: false },
         },
       ],
-    };
-    chartMarcas.setOption(optionMarcas);
+    });
 
-    // 4. CRÍTICO: Responsividad sin scroll.
-    // Obliga a todos los gráficos a recalcular su tamaño cuando el iframe/ventana cambie.
+    // --- Responsividad Automática ---
     window.addEventListener("resize", () => {
       myCharts.forEach((chart) => chart.resize());
     });
