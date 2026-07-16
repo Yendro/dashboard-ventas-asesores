@@ -1,6 +1,6 @@
 import typer
 import logging
-from config import configurar_logger, OUTPUT_DIR
+from src.config import configurar_logger, OUTPUT_DIR
 from src.bigquery_client import BigQueryClient
 from src.token_manager import TokenManager
 from src.drive_client import DriveClient
@@ -69,6 +69,53 @@ def update_data():
         logger.info("--- Pipeline finalizada con éxito ---")
     except Exception as e:
         logger.error(f"✗ Error durante la carga de archivos a Drive: {str(e)}")
+        raise typer.Exit(code=1)
+
+@app.command()
+def verify_tokens():
+    """
+    Solo ejecuta la revisión de la base de datos para crear tokens nuevos sin subir data de ventas.
+    """
+    logger.info("--- Iniciando verificación de tokens ---")
+    
+    try:
+        # 1. Extracción (Necesitamos la lista actualizada de asesores)
+        bq_client = BigQueryClient()
+        dataframes = bq_client.ejecutar_todas_consultas()
+        
+        df_desglosadas = dataframes.get('ventas_desglosadas')
+        
+        if df_desglosadas is None:
+             logger.error("Falta la consulta de ventas_desglosadas en data/src.")
+             raise typer.Exit(code=1)
+
+        # 2. Gestión de Tokens
+        logger.info("Revisando nuevos asesores para generación de tokens...")
+        if 'Asesor' in df_desglosadas.columns:
+            asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
+            token_mgr = TokenManager(OUTPUT_DIR)
+            
+            # Recordar que actualizar_tokens retorna True si asignó UUIDs nuevos
+            hubo_cambios = token_mgr.actualizar_tokens(asesores_unicos)
+            
+            # 3. Carga selectiva a Drive
+            if hubo_cambios:
+                logger.info("Se detectaron nuevos asesores. Subiendo config.json a Drive...")
+                drive_client = DriveClient()
+                ruta_config = OUTPUT_DIR / "config.json"
+                
+                if ruta_config.exists():
+                    drive_client.subir_archivo(ruta_config)
+            else:
+                logger.info("No hubo cambios en los tokens. No se requiere actualización en Drive.")
+                
+        else:
+            logger.warning("No se encontró la columna 'Asesor' en la base de datos. Se omitió la validación.")
+
+        logger.info("--- Verificación de tokens finalizada ---")
+
+    except Exception as e:
+        logger.error(f"✗ Error crítico durante la verificación de tokens: {str(e)}")
         raise typer.Exit(code=1)
 
 if __name__ == "__main__":
