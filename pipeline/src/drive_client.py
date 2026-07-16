@@ -8,7 +8,7 @@ from src.config import GLOBAL_CONFIG
 logger = logging.getLogger(__name__)
 
 class DriveClient:
-    def __init__(self):
+    def __init__(self) -> None:
         self.credentials_path = Path(GLOBAL_CONFIG["DRIVE_CREDENTIALS_PATH"])
         self.folder_id = GLOBAL_CONFIG["DRIVE_FOLDER_ID"]
         self.service = self._autenticar()
@@ -20,15 +20,24 @@ class DriveClient:
                 self.credentials_path,
                 scopes=["https://www.googleapis.com/auth/drive"]
             )
+            service = build('drive', 'v3', credentials=credentials, cache_discovery=False)
             logger.info("Conexión a Google Drive establecida.")
-            return build('drive', 'v3', credentials=credentials)
+            return service
         except Exception as e:
             logger.error(f"Error autenticando con Drive: {e}")
             raise
 
-    def _buscar_archivo(self, nombre_archivo: str) -> str:
+    @staticmethod
+    def _escapar_valor_query(valor: str) -> str:
+        """
+        Escapa caracteres especiales usados en consultas `q` de Drive.
+        """
+        return (valor.replace("\\", "\\\\").replace("'", "\\'"))
+
+    def _buscar_archivo(self, nombre_archivo: str) -> str | None:
         """Busca un archivo por nombre dentro de la carpeta destino y retorna su ID."""
-        query = f"'{self.folder_id}' in parents and name='{nombre_archivo}' and trashed=false"
+        nombre_seguro = self._escapar_valor_query(nombre_archivo)
+        query = f"'{self.folder_id}' in parents and name='{nombre_seguro}' and trashed=false"
         resultados = self.service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
         archivos = resultados.get('files', [])
         return archivos[0]['id'] if archivos else None
