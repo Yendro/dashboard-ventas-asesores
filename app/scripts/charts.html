@@ -23,6 +23,35 @@
     chartTuberiaMeses;
 
   document.addEventListener("DOMContentLoaded", () => {
+    // 1. Iniciar petición al servidor sin bloquear la pantalla
+    google.script.run
+      .withSuccessHandler((respuesta) => {
+        if (respuesta.error) {
+          document.getElementById("pantalla-carga").classList.add("oculto");
+          document.getElementById("pantalla-error").classList.remove("oculto");
+          document.getElementById("mensaje-error").innerText = respuesta.error;
+          return;
+        }
+
+        // Éxito: Guardar datos, ocultar loader y mostrar dashboard
+        DATOS_DESGLOSADOS = respuesta.datos;
+        document.getElementById("nombre-asesor").innerText = respuesta.asesor;
+
+        document.getElementById("pantalla-carga").classList.add("oculto");
+        document.getElementById("app-container").classList.remove("oculto");
+
+        // 2. Inicializar gráficos y calcular ahora que tenemos datos
+        inicializarGraficos();
+        renderizarDashboard(); // Se calcularán las ventas a partir de la data desglosada
+      })
+      .withFailureHandler((error) => {
+        console.error(error);
+        document.getElementById("pantalla-carga").classList.add("oculto");
+        document.getElementById("pantalla-error").classList.remove("oculto");
+        document.getElementById("mensaje-error").innerText =
+          "Fallo de conexión con el servidor.";
+      })
+      .obtenerDatosAsesor(TOKEN_URL);
     // Inicializar instancias
     chartVentasMeses = echarts.init(
       document.getElementById("chart-ventas-meses"),

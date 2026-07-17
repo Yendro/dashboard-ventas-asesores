@@ -6,18 +6,46 @@
     <title>Dashboard de Ventas</title>
 
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-
     <?!= HtmlService.createHtmlOutputFromFile('styles/dashboard').getContent();
+    ?> <?!=HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent();
     ?>
   </head>
   <body>
-    <div id="app-container">
+    <!-- PANTALLA DE CARGA -->
+    <div id="pantalla-carga">
+      <div class="spinner"></div>
+      <h2 style="margin-top: 20px; color: var(--text-main)">
+        Cargando tu información...
+      </h2>
+    </div>
+
+    <!-- PANTALLA DE ERROR -->
+    <div id="pantalla-error" class="oculto">
+      <h1 style="color: var(--accent); font-size: 4rem; margin: 0">!</h1>
+      <h2 id="mensaje-error" style="color: var(--text-main)">
+        Error de Acceso
+      </h2>
+    </div>
+
+    <div id="app-container" class="oculto">
+      <!-- CABECERA -->
       <header>
-        <div>
-          <h1>Ventas por Asesores</h1>
-          <span class="subtitle"
-            >General: <span id="nombre-asesor"><?= asesor ?></span></span
-          >
+        <div class="header-left">
+          <!-- LOGO -->
+          <div class="logo-container">
+            <img
+              src=""
+              id="logo-empresa"
+              alt="Logo"
+              onerror="this.style.display = 'none'"
+            />
+          </div>
+          <div>
+            <h1>Ventas por Asesores</h1>
+            <span class="subtitle"
+              >General: <span id="nombre-asesor">Cargando...</span></span
+            >
+          </div>
         </div>
         <div class="date-filters">
           <label>Fecha:</label>
@@ -43,7 +71,6 @@
           <div class="kpi-title">Unidades</div>
           <div class="kpi-value" id="kpi-tuberia-unidades">0</div>
         </div>
-
         <div class="card chart-span-2">
           <div class="chart-title">Ventas por mes</div>
           <div id="chart-ventas-meses" class="echart-container"></div>
@@ -52,7 +79,6 @@
           <div class="chart-title">Desglose (Marca / Desarrollo)</div>
           <div id="chart-arbol" class="echart-container"></div>
         </div>
-
         <div class="card chart-span-1">
           <div class="chart-title">Ventas por desarrollo</div>
           <div id="chart-desarrollo" class="echart-container"></div>
@@ -61,17 +87,17 @@
           <div class="chart-title">Distribución por marca</div>
           <div id="chart-marcas" class="echart-container"></div>
         </div>
-
         <div class="card chart-span-2">
-          <div class="chart-title">Tubería por mes</div>
-          <div id="chart-tuberia-meses" class="echart-container"></div>
+          <div class="chart-title">Tubería por estatus</div>
+          <div id="chart-tuberia-estatus" class="echart-container"></div>
         </div>
       </main>
     </div>
 
+    <!-- INYECCIÓN DEL TOKEN -->
     <script>
-      const ASESOR = "<?= asesor ?>";
-      const DATOS_AGRUPADOS = <?!= datosAgrupados ?>;
+      const TOKEN_URL = "<?= token ?>";
+      let DATOS_DESGLOSADOS = []; // Se llenará asíncronamente
     </script>
 
     <?!= HtmlService.createHtmlOutputFromFile('scripts/charts').getContent(); ?>
