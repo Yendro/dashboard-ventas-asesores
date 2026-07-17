@@ -5,10 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard de Ventas</title>
 
+    <!-- Librería ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- Librería Grid.js (Esencial para la vista de tabla) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+
     <?!= HtmlService.createHtmlOutputFromFile('styles/dashboard').getContent();
-    ?> <?!=HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent();
-    ?>
+    ?> <?!=
+    HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent(); ?>
+
+    <style>
+      /* Estilos para la navegación y las vistas */
+      .oculto {
+        display: none !important;
+      }
+
+      nav {
+        display: flex;
+        gap: 10px;
+        margin: 0 15px;
+      }
+      nav button {
+        background-color: var(--card-bg);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+      }
+      nav button.activo,
+      nav button:hover {
+        background-color: var(--accent);
+        color: white;
+      }
+
+      /* Contenedores para dividir el Tablero de la Tabla */
+      .vista-wrapper {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      #contenedor-tabla {
+        background: var(--card-bg);
+        padding: 15px;
+        border-radius: 6px;
+        height: 100%;
+        overflow: auto;
+        color: var(--text-main);
+      }
+    </style>
   </head>
   <body>
     <!-- PANTALLA DE CARGA -->
@@ -34,7 +87,7 @@
           <!-- LOGO -->
           <div class="logo-container">
             <img
-              src=""
+              src="https://raw.githubusercontent.com/Yendro/dashboard-ventas-asesores/main/app/img/glr-solo-mitad.png"
               id="logo-empresa"
               alt="Logo"
               onerror="this.style.display = 'none'"
@@ -47,6 +100,13 @@
             >
           </div>
         </div>
+
+        <!-- NAVEGACIÓN -->
+        <nav>
+          <button id="btn-dashboard" class="activo">Ver Tablero</button>
+          <button id="btn-tabla">Ver Listado</button>
+        </nav>
+
         <div class="date-filters">
           <label>Fecha:</label>
           <input type="date" id="fecha-inicio" />
@@ -54,44 +114,52 @@
         </div>
       </header>
 
-      <main class="dashboard-grid">
-        <div class="card kpi">
-          <div class="kpi-title">Ventas</div>
-          <div class="kpi-value" id="kpi-ventas">$0</div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-title">Unidades</div>
-          <div class="kpi-value" id="kpi-unidades">0</div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-title">Tubería</div>
-          <div class="kpi-value" id="kpi-tuberia-val">$0</div>
-        </div>
-        <div class="card kpi">
-          <div class="kpi-title">Unidades</div>
-          <div class="kpi-value" id="kpi-tuberia-unidades">0</div>
-        </div>
-        <div class="card chart-span-2">
-          <div class="chart-title">Ventas por mes</div>
-          <div id="chart-ventas-meses" class="echart-container"></div>
-        </div>
-        <div class="card chart-span-2">
-          <div class="chart-title">Desglose (Marca / Desarrollo)</div>
-          <div id="chart-arbol" class="echart-container"></div>
-        </div>
-        <div class="card chart-span-1">
-          <div class="chart-title">Ventas por desarrollo</div>
-          <div id="chart-desarrollo" class="echart-container"></div>
-        </div>
-        <div class="card chart-span-1">
-          <div class="chart-title">Distribución por marca</div>
-          <div id="chart-marcas" class="echart-container"></div>
-        </div>
-        <div class="card chart-span-2">
-          <div class="chart-title">Tubería por estatus</div>
-          <div id="chart-tuberia-estatus" class="echart-container"></div>
-        </div>
-      </main>
+      <!-- VISTA 1: TABLERO DE ECHARTS -->
+      <section id="vista-dashboard" class="vista-wrapper">
+        <main class="dashboard-grid">
+          <div class="card kpi">
+            <div class="kpi-title">Ventas</div>
+            <div class="kpi-value" id="kpi-ventas">$0</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Unidades</div>
+            <div class="kpi-value" id="kpi-unidades">0</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Tubería</div>
+            <div class="kpi-value" id="kpi-tuberia-val">$0</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-title">Unidades</div>
+            <div class="kpi-value" id="kpi-tuberia-unidades">0</div>
+          </div>
+          <div class="card chart-span-2">
+            <div class="chart-title">Ventas por mes</div>
+            <div id="chart-ventas-meses" class="echart-container"></div>
+          </div>
+          <div class="card chart-span-2">
+            <div class="chart-title">Desglose (Marca / Desarrollo)</div>
+            <div id="chart-arbol" class="echart-container"></div>
+          </div>
+          <div class="card chart-span-1">
+            <div class="chart-title">Ventas por desarrollo</div>
+            <div id="chart-desarrollo" class="echart-container"></div>
+          </div>
+          <div class="card chart-span-1">
+            <div class="chart-title">Distribución por marca</div>
+            <div id="chart-marcas" class="echart-container"></div>
+          </div>
+          <div class="card chart-span-2">
+            <div class="chart-title">Tubería por estatus</div>
+            <div id="chart-tuberia-estatus" class="echart-container"></div>
+          </div>
+        </main>
+      </section>
+
+      <!-- VISTA 2: TABLA DE GRID.JS -->
+      <section id="vista-tabla" class="vista-wrapper oculto">
+        <div id="contenedor-tabla"></div>
+      </section>
     </div>
 
     <!-- INYECCIÓN DEL TOKEN -->

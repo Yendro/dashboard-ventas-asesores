@@ -21,7 +21,7 @@
     chartDesarrollo,
     chartArbol,
     chartTuberiaEstatus;
-  let gridJsInstance = null; // Instancia de la tabla
+  let gridJsInstance = null;
 
   document.addEventListener("DOMContentLoaded", () => {
     // 1. NAVEGACIÓN Y EVENT LISTENERS
@@ -35,7 +35,6 @@
       vistaTabla.classList.add("oculto");
       btnDashboard.classList.add("activo");
       btnTabla.classList.remove("activo");
-      // Forzar resize de gráficos al volver a la vista para evitar renderizados aplastados
       myCharts.forEach((chart) => chart.resize());
     });
 
@@ -45,13 +44,11 @@
       btnTabla.classList.add("activo");
       btnDashboard.classList.remove("activo");
 
-      // Renderizar tabla (Lazy Loading) solo la primera vez que se visita
       if (!gridJsInstance) {
         renderizarTablaGridJs();
       }
     });
 
-    // Listeners de los filtros de fecha
     document
       .getElementById("fecha-inicio")
       .addEventListener("change", renderizarDashboard);
@@ -59,7 +56,7 @@
       .getElementById("fecha-fin")
       .addEventListener("change", renderizarDashboard);
 
-    // 2. PETICIÓN ASÍNCRONA AL BACKEND (APPS SCRIPT)
+    // 2. PETICIÓN ASÍNCRONA AL BACKEND
     google.script.run
       .withSuccessHandler((respuesta) => {
         if (respuesta.error) {
@@ -69,14 +66,12 @@
           return;
         }
 
-        // Éxito: Guardar datos globales y mostrar interfaz
         DATOS_DESGLOSADOS = respuesta.datos;
         document.getElementById("nombre-asesor").innerText = respuesta.asesor;
 
         document.getElementById("pantalla-carga").classList.add("oculto");
         document.getElementById("app-container").classList.remove("oculto");
 
-        // Inicializar contenedores ECharts y procesar la información
         inicializarGraficos();
         renderizarDashboard();
       })
@@ -100,7 +95,7 @@
     chartMarcas = echarts.init(document.getElementById("chart-marcas"));
     chartTuberiaEstatus = echarts.init(
       document.getElementById("chart-tuberia-estatus"),
-    ); // Treemap de estatus
+    );
 
     myCharts.push(
       chartVentasMeses,
@@ -117,7 +112,7 @@
 
   // 4. PROCESAMIENTO Y RENDERIZADO DEL DASHBOARD
   function renderizarDashboard() {
-    const fInicio = document.getElementById("fecha-inicio").value; // YYYY-MM-DD
+    const fInicio = document.getElementById("fecha-inicio").value;
     const fFin = document.getElementById("fecha-fin").value;
 
     let kpi = { ventas: 0, unidades: 0, tuberia: 0, tuberiaUnidades: 0 };
@@ -145,40 +140,44 @@
     ];
     mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
 
-    // Filtrar primero el arreglo maestro por el rango de fechas
+    // Filtrar primero el arreglo maestro
     const datosFiltrados = DATOS_DESGLOSADOS.filter((fila) => {
-      // Determinamos si la venta fue finalizada evaluando su estatus numérico o de texto
+      // CORRECCIÓN 1: Detección flexible de estatus (Captura Finalizado, Finalizadas, Finalizada Y Liquidada, etc)
+      const estatusTexto = String(
+        fila.EstatusVenta || fila.Estatus || "",
+      ).toUpperCase();
       const esFinalizado =
         fila.Estatus === 7 ||
         fila.Estatus === 8 ||
-        fila.Estatus === "Finalizado";
+        estatusTexto.includes("FINALIZAD");
 
-      // Asignamos la fecha correspondiente (Finalizado o Proceso)
       const fechaString = esFinalizado
         ? fila.FechaFinalizado || fila.FechaProceso
         : fila.FechaProceso;
       if (!fechaString) return false;
 
-      // Extraemos YYYY-MM-DD para una comparación limpia
-      const fechaFila = fechaString.substring(0, 10);
+      const fechaFila = String(fechaString).substring(0, 10);
 
       if (fInicio && fechaFila < fInicio) return false;
       if (fFin && fechaFila > fFin) return false;
       return true;
     });
 
-    // Iterar sobre los datos ya filtrados en fecha
+    // Iterar sobre los datos ya filtrados
     datosFiltrados.forEach((fila) => {
       const precio = Number(fila.PrecioVenta) || 0;
-      const unidades = Number(fila.Unidades || fila.M2 || 1); // Adaptación genérica de unidades
+      const unidades = Number(fila.Unidades || fila.M2 || 1);
       const marca = fila.Marca || "Sin Marca";
       const desarrollo = fila.Desarrollo || "Sin Desarrollo";
       const estatusNombre = fila.EstatusVenta || fila.Estatus || "En Proceso";
 
+      const estatusTexto = String(
+        fila.EstatusVenta || fila.Estatus || "",
+      ).toUpperCase();
       const esFinalizado =
         fila.Estatus === 7 ||
         fila.Estatus === 8 ||
-        fila.Estatus === "Finalizado";
+        estatusTexto.includes("FINALIZAD");
 
       const fechaString = esFinalizado
         ? fila.FechaFinalizado || fila.FechaProceso
@@ -199,7 +198,6 @@
         resumen.ventasPorDesarrollo[desarrollo] =
           (resumen.ventasPorDesarrollo[desarrollo] || 0) + precio;
 
-        // Construcción jerárquica para el árbol de Marcas -> Desarrollo
         if (!resumen.arbol[marca])
           resumen.arbol[marca] = { total: 0, desarrollos: {} };
         resumen.arbol[marca].total += precio;
@@ -208,13 +206,11 @@
       } else {
         kpi.tuberia += precio;
         kpi.tuberiaUnidades += unidades;
-        // Agrupar tubería utilizando el nombre real del estatus para el Treemap
         resumen.tuberiaEstatus[estatusNombre] =
           (resumen.tuberiaEstatus[estatusNombre] || 0) + precio;
       }
     });
 
-    // Actualizar DOM de KPIs
     document.getElementById("kpi-ventas").innerText = formateadorMoneda.format(
       kpi.ventas,
     );
@@ -225,7 +221,6 @@
     document.getElementById("kpi-tuberia-unidades").innerText =
       kpi.tuberiaUnidades.toLocaleString("es-MX");
 
-    // Preparar series finales
     const ventasMesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
     const marcasData = Object.keys(resumen.ventasPorMarca)
       .map((k) => ({ name: k, value: resumen.ventasPorMarca[k] }))
@@ -235,15 +230,10 @@
       .filter((i) => i.value > 0)
       .sort((a, b) => a.value - b.value);
 
-    // Arreglo para el Treemap de Estatus
     const estatusData = Object.keys(resumen.tuberiaEstatus)
-      .map((k) => ({
-        name: k,
-        value: resumen.tuberiaEstatus[k],
-      }))
+      .map((k) => ({ name: k, value: resumen.tuberiaEstatus[k] }))
       .filter((i) => i.value > 0);
 
-    // Jerarquía del Árbol Horizontal
     const treeData = {
       name: "Ventas",
       children: Object.keys(resumen.arbol).map((marca) => ({
@@ -256,7 +246,7 @@
       })),
     };
 
-    // Inyectar configuraciones limpiando las previas
+    // CORRECCIÓN 2: Optimización de paddings (grid) para llenar tarjetas
     chartVentasMeses.setOption(
       {
         color: coloresDashboard,
@@ -265,7 +255,7 @@
           formatter: (p) =>
             `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
         },
-        grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
+        grid: { top: 10, right: 0, bottom: 0, left: 0, containLabel: true },
         xAxis: {
           type: "category",
           data: mesesOrden,
@@ -294,7 +284,7 @@
         series: [
           {
             type: "pie",
-            radius: "75%",
+            radius: "85%",
             center: ["50%", "50%"],
             label: { color: "#fff", formatter: "{b}\n{d}%" },
             data: marcasData,
@@ -313,7 +303,7 @@
           formatter: (p) =>
             `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
         },
-        grid: { top: 10, right: 20, bottom: 20, left: 10, containLabel: true },
+        grid: { top: 10, right: 15, bottom: 0, left: 0, containLabel: true },
         xAxis: {
           type: "value",
           splitLine: { show: false },
@@ -352,10 +342,10 @@
           {
             type: "tree",
             data: [treeData],
-            top: "5%",
-            bottom: "5%",
-            left: "15%",
-            right: "25%",
+            top: "0%",
+            bottom: "0%",
+            left: "10%",
+            right: "20%", // Más ancho
             symbolSize: 8,
             itemStyle: { color: "#eb6c61", borderColor: "#eb6c61" },
             label: {
@@ -382,7 +372,6 @@
       true,
     );
 
-    // El Treemap visualiza el estatus de la tubería
     chartTuberiaEstatus.setOption(
       {
         color: coloresDashboard,
@@ -393,11 +382,15 @@
           {
             type: "treemap",
             data: estatusData,
-            roam: false, // Deshabilitar zoom para mantener el grid estable
+            top: 10,
+            bottom: 0,
+            left: 0,
+            right: 0, // Fuerza al Treemap a tocar los bordes
+            roam: false,
             nodeClick: false,
             breadcrumb: { show: false },
             label: { show: true, formatter: "{b}\n{c}", color: "#fff" },
-            itemStyle: { borderColor: "#2b2b2b", borderWidth: 2 }, // Separador oscuro entre bloques
+            itemStyle: { borderColor: "#2b2b2b", borderWidth: 2 },
           },
         ],
       },
@@ -405,28 +398,37 @@
     );
   }
 
-  // 5. RENDERIZADO DE TABLA (GRID.JS)
+  // CORRECCIÓN 3: Reestructuración de Grid.js con Array plano para evitar errores de renderizado
   function renderizarTablaGridJs() {
+    // Mapeamos los objetos de forma segura a un arreglo simple
+    const datosTabla = DATOS_DESGLOSADOS.map((fila) => [
+      fila.Marca || "Sin Marca",
+      fila.Desarrollo || "Sin Desarrollo",
+      fila.Unidad || "N/A",
+      fila.Cliente || "Sin Cliente",
+      Number(fila.PrecioVenta) || 0,
+      fila.EstatusVenta || fila.Estatus || "Sin Estatus",
+      fila.FechaProceso || fila.FechaFinalizado || "Sin Fecha",
+    ]);
+
     gridJsInstance = new gridjs.Grid({
       columns: [
-        { id: "Marca", name: "Marca" },
-        { id: "Desarrollo", name: "Desarrollo" },
-        { id: "Unidad", name: "Unidad" },
-        { id: "Cliente", name: "Cliente" },
+        "Marca",
+        "Desarrollo",
+        "Unidad",
+        "Cliente",
         {
-          id: "PrecioVenta",
           name: "Precio",
           formatter: (cell) => formateadorMoneda.format(cell),
         },
-        { id: "EstatusVenta", name: "Estatus" },
+        "Estatus",
         {
-          id: "FechaProceso",
           name: "Fecha",
-          // Limpiar la fecha que llega de la fuente para visualización
-          formatter: (cell) => (cell ? cell.substring(0, 10) : "Sin Fecha"),
+          formatter: (cell) =>
+            cell !== "Sin Fecha" ? String(cell).substring(0, 10) : cell,
         },
       ],
-      data: DATOS_DESGLOSADOS,
+      data: datosTabla,
       search: true,
       sort: true,
       pagination: { limit: 30 },
@@ -439,10 +441,7 @@
           results: () => "registros",
         },
       },
-      // Configuración estética para que coincida con el tema oscuro/claro
-      style: {
-        table: { "white-space": "nowrap" },
-      },
+      style: { table: { "white-space": "nowrap" } },
     }).render(document.getElementById("contenedor-tabla"));
   }
 </script>
