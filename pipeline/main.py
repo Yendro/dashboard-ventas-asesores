@@ -21,10 +21,9 @@ def update_data():
         logger.error("No se extrajeron datos. Abortando pipeline.")
         raise typer.Exit(code=1)
         
-    df_agrupadas = dataframes.get('ventas_agrupadas')
     df_desglosadas = dataframes.get('ventas_desglosadas')
     
-    if df_desglosadas is None or df_agrupadas is None:
+    if df_desglosadas is None:
          logger.error("Faltan las consultas requeridas en data/src.")
          raise typer.Exit(code=1)
 
@@ -34,8 +33,6 @@ def update_data():
     ruta_desglosadas = OUTPUT_DIR / "ventas_desglosadas.json"
     
     try:
-        # Date_format='iso' previene errores de serialización de fechas en Javascript
-        df_agrupadas.to_json(ruta_agrupadas, orient="records", date_format="iso", force_ascii=False)
         df_desglosadas.to_json(ruta_desglosadas, orient="records", date_format="iso", force_ascii=False)
         logger.info("✓ Archivos JSON generados correctamente.")
     except Exception as e:
