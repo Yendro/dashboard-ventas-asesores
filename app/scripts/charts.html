@@ -7,23 +7,59 @@
     "#b54b42",
   ];
 
+  // Utilidad para formatear números a moneda (MXN)
   const formateadorMoneda = new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: "MXN",
     maximumFractionDigits: 0,
   });
 
+  // Variables globales
   let myCharts = [];
-
-  // Variables para las instancias de ECharts
   let chartVentasMeses,
     chartMarcas,
     chartDesarrollo,
     chartArbol,
-    chartTuberiaMeses;
+    chartTuberiaEstatus;
+  let gridJsInstance = null; // Instancia de la tabla
 
   document.addEventListener("DOMContentLoaded", () => {
-    // 1. Iniciar petición al servidor sin bloquear la pantalla
+    // 1. NAVEGACIÓN Y EVENT LISTENERS
+    const btnDashboard = document.getElementById("btn-dashboard");
+    const btnTabla = document.getElementById("btn-tabla");
+    const vistaDashboard = document.getElementById("vista-dashboard");
+    const vistaTabla = document.getElementById("vista-tabla");
+
+    btnDashboard.addEventListener("click", () => {
+      vistaDashboard.classList.remove("oculto");
+      vistaTabla.classList.add("oculto");
+      btnDashboard.classList.add("activo");
+      btnTabla.classList.remove("activo");
+      // Forzar resize de gráficos al volver a la vista para evitar renderizados aplastados
+      myCharts.forEach((chart) => chart.resize());
+    });
+
+    btnTabla.addEventListener("click", () => {
+      vistaTabla.classList.remove("oculto");
+      vistaDashboard.classList.add("oculto");
+      btnTabla.classList.add("activo");
+      btnDashboard.classList.remove("activo");
+
+      // Renderizar tabla (Lazy Loading) solo la primera vez que se visita
+      if (!gridJsInstance) {
+        renderizarTablaGridJs();
+      }
+    });
+
+    // Listeners de los filtros de fecha
+    document
+      .getElementById("fecha-inicio")
+      .addEventListener("change", renderizarDashboard);
+    document
+      .getElementById("fecha-fin")
+      .addEventListener("change", renderizarDashboard);
+
+    // 2. PETICIÓN ASÍNCRONA AL BACKEND (APPS SCRIPT)
     google.script.run
       .withSuccessHandler((respuesta) => {
         if (respuesta.error) {
@@ -33,84 +69,64 @@
           return;
         }
 
-        // Éxito: Guardar datos, ocultar loader y mostrar dashboard
+        // Éxito: Guardar datos globales y mostrar interfaz
         DATOS_DESGLOSADOS = respuesta.datos;
         document.getElementById("nombre-asesor").innerText = respuesta.asesor;
 
         document.getElementById("pantalla-carga").classList.add("oculto");
         document.getElementById("app-container").classList.remove("oculto");
 
-        // 2. Inicializar gráficos y calcular ahora que tenemos datos
+        // Inicializar contenedores ECharts y procesar la información
         inicializarGraficos();
-        renderizarDashboard(); // Se calcularán las ventas a partir de la data desglosada
+        renderizarDashboard();
       })
       .withFailureHandler((error) => {
-        console.error(error);
+        console.error("Error en petición:", error);
         document.getElementById("pantalla-carga").classList.add("oculto");
         document.getElementById("pantalla-error").classList.remove("oculto");
         document.getElementById("mensaje-error").innerText =
           "Fallo de conexión con el servidor.";
       })
       .obtenerDatosAsesor(TOKEN_URL);
-    // Inicializar instancias
+  });
+
+  // 3. INICIALIZACIÓN DE GRÁFICOS
+  function inicializarGraficos() {
     chartVentasMeses = echarts.init(
       document.getElementById("chart-ventas-meses"),
     );
     chartArbol = echarts.init(document.getElementById("chart-arbol"));
     chartDesarrollo = echarts.init(document.getElementById("chart-desarrollo"));
     chartMarcas = echarts.init(document.getElementById("chart-marcas"));
-    chartTuberiaMeses = echarts.init(
-      document.getElementById("chart-tuberia-meses"),
-    );
+    chartTuberiaEstatus = echarts.init(
+      document.getElementById("chart-tuberia-estatus"),
+    ); // Treemap de estatus
 
     myCharts.push(
       chartVentasMeses,
       chartArbol,
       chartDesarrollo,
       chartMarcas,
-      chartTuberiaMeses,
+      chartTuberiaEstatus,
     );
 
-    // Event Listeners para los filtros de fecha
-    document
-      .getElementById("fecha-inicio")
-      .addEventListener("change", renderizarDashboard);
-    document
-      .getElementById("fecha-fin")
-      .addEventListener("change", renderizarDashboard);
-
-    // Responsividad Automática
     window.addEventListener("resize", () => {
       myCharts.forEach((chart) => chart.resize());
     });
+  }
 
-    // Renderizado Inicial
-    renderizarDashboard();
-  });
-
+  // 4. PROCESAMIENTO Y RENDERIZADO DEL DASHBOARD
   function renderizarDashboard() {
-    // 1. OBTENER FECHAS DEL DOM
-    const fInicio = document.getElementById("fecha-inicio").value; // Formato: "YYYY-MM-DD"
+    const fInicio = document.getElementById("fecha-inicio").value; // YYYY-MM-DD
     const fFin = document.getElementById("fecha-fin").value;
 
-    // 2. FILTRAR DATOS
-    const datosFiltrados = DATOS_AGRUPADOS.filter((fila) => {
-      // Extraemos solo la parte YYYY-MM-DD para una comparación limpia
-      const fechaFila = fila.FechaMesAnio.substring(0, 10);
-
-      if (fInicio && fechaFila < fInicio) return false;
-      if (fFin && fechaFila > fFin) return false;
-      return true;
-    });
-
-    // 3. INICIALIZAR ACUMULADORES
     let kpi = { ventas: 0, unidades: 0, tuberia: 0, tuberiaUnidades: 0 };
     let resumen = {
       ventasPorMes: {},
-      tuberiaPorMes: {},
       ventasPorMarca: {},
       ventasPorDesarrollo: {},
       arbol: {},
+      tuberiaEstatus: {},
     };
 
     const mesesOrden = [
@@ -127,25 +143,53 @@
       "nov",
       "dic",
     ];
-    mesesOrden.forEach((m) => {
-      resumen.ventasPorMes[m] = 0;
-      resumen.tuberiaPorMes[m] = 0;
+    mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
+
+    // Filtrar primero el arreglo maestro por el rango de fechas
+    const datosFiltrados = DATOS_DESGLOSADOS.filter((fila) => {
+      // Determinamos si la venta fue finalizada evaluando su estatus numérico o de texto
+      const esFinalizado =
+        fila.Estatus === 7 ||
+        fila.Estatus === 8 ||
+        fila.Estatus === "Finalizado";
+
+      // Asignamos la fecha correspondiente (Finalizado o Proceso)
+      const fechaString = esFinalizado
+        ? fila.FechaFinalizado || fila.FechaProceso
+        : fila.FechaProceso;
+      if (!fechaString) return false;
+
+      // Extraemos YYYY-MM-DD para una comparación limpia
+      const fechaFila = fechaString.substring(0, 10);
+
+      if (fInicio && fechaFila < fInicio) return false;
+      if (fFin && fechaFila > fFin) return false;
+      return true;
     });
 
-    // 4. PROCESAR DATOS
+    // Iterar sobre los datos ya filtrados en fecha
     datosFiltrados.forEach((fila) => {
       const precio = Number(fila.PrecioVenta) || 0;
-      const unidades = Number(fila.Unidades) || 0;
+      const unidades = Number(fila.Unidades || fila.M2 || 1); // Adaptación genérica de unidades
       const marca = fila.Marca || "Sin Marca";
       const desarrollo = fila.Desarrollo || "Sin Desarrollo";
+      const estatusNombre = fila.EstatusVenta || fila.Estatus || "En Proceso";
 
-      const fechaObj = new Date(fila.FechaMesAnio);
+      const esFinalizado =
+        fila.Estatus === 7 ||
+        fila.Estatus === 8 ||
+        fila.Estatus === "Finalizado";
+
+      const fechaString = esFinalizado
+        ? fila.FechaFinalizado || fila.FechaProceso
+        : fila.FechaProceso;
+      const fechaObj = new Date(fechaString);
       const mesCorto = fechaObj
         .toLocaleString("es-ES", { month: "short", timeZone: "UTC" })
         .toLowerCase()
         .replace(".", "");
 
-      if (fila.Estatus === "Finalizado") {
+      if (esFinalizado) {
         kpi.ventas += precio;
         kpi.unidades += unidades;
         if (resumen.ventasPorMes[mesCorto] !== undefined)
@@ -154,22 +198,23 @@
           (resumen.ventasPorMarca[marca] || 0) + precio;
         resumen.ventasPorDesarrollo[desarrollo] =
           (resumen.ventasPorDesarrollo[desarrollo] || 0) + precio;
-      } else if (fila.Estatus === "Proceso") {
-        kpi.tuberia += precio;
-        kpi.tuberiaUnidades += unidades;
-        if (resumen.tuberiaPorMes[mesCorto] !== undefined)
-          resumen.tuberiaPorMes[mesCorto] += precio;
 
-        // Construcción jerárquica para el árbol de tubería
+        // Construcción jerárquica para el árbol de Marcas -> Desarrollo
         if (!resumen.arbol[marca])
           resumen.arbol[marca] = { total: 0, desarrollos: {} };
         resumen.arbol[marca].total += precio;
         resumen.arbol[marca].desarrollos[desarrollo] =
           (resumen.arbol[marca].desarrollos[desarrollo] || 0) + precio;
+      } else {
+        kpi.tuberia += precio;
+        kpi.tuberiaUnidades += unidades;
+        // Agrupar tubería utilizando el nombre real del estatus para el Treemap
+        resumen.tuberiaEstatus[estatusNombre] =
+          (resumen.tuberiaEstatus[estatusNombre] || 0) + precio;
       }
     });
 
-    // 5. ACTUALIZAR DOM (KPIs)
+    // Actualizar DOM de KPIs
     document.getElementById("kpi-ventas").innerText = formateadorMoneda.format(
       kpi.ventas,
     );
@@ -180,10 +225,8 @@
     document.getElementById("kpi-tuberia-unidades").innerText =
       kpi.tuberiaUnidades.toLocaleString("es-MX");
 
-    // 6. PREPARAR DATA PARA GRÁFICOS
+    // Preparar series finales
     const ventasMesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
-    const tuberiaMesesData = mesesOrden.map((m) => resumen.tuberiaPorMes[m]);
-
     const marcasData = Object.keys(resumen.ventasPorMarca)
       .map((k) => ({ name: k, value: resumen.ventasPorMarca[k] }))
       .filter((i) => i.value > 0);
@@ -192,9 +235,17 @@
       .filter((i) => i.value > 0)
       .sort((a, b) => a.value - b.value);
 
-    // Formatear datos para el Árbol (Root -> Marcas -> Desarrollos)
+    // Arreglo para el Treemap de Estatus
+    const estatusData = Object.keys(resumen.tuberiaEstatus)
+      .map((k) => ({
+        name: k,
+        value: resumen.tuberiaEstatus[k],
+      }))
+      .filter((i) => i.value > 0);
+
+    // Jerarquía del Árbol Horizontal
     const treeData = {
-      name: "Tubería",
+      name: "Ventas",
       children: Object.keys(resumen.arbol).map((marca) => ({
         name: marca,
         value: resumen.arbol[marca].total,
@@ -205,9 +256,7 @@
       })),
     };
 
-    // 7. INYECTAR OPCIONES A ECHARTS
-    // Usamos (option, true) para forzar a ECharts a limpiar el gráfico anterior y aplicar el nuevo sin mezclar datos
-
+    // Inyectar configuraciones limpiando las previas
     chartVentasMeses.setOption(
       {
         color: coloresDashboard,
@@ -230,32 +279,6 @@
           axisLabel: { show: false },
         },
         series: [{ data: ventasMesesData, type: "bar", barWidth: "70%" }],
-      },
-      true,
-    );
-
-    chartTuberiaMeses.setOption(
-      {
-        color: coloresDashboard,
-        tooltip: {
-          trigger: "axis",
-          formatter: (p) =>
-            `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
-        },
-        grid: { top: 10, right: 10, bottom: 20, left: 10, containLabel: true },
-        xAxis: {
-          type: "category",
-          data: mesesOrden,
-          axisLabel: { color: "#a0a0a0" },
-          axisLine: { show: false },
-          axisTick: { show: false },
-        },
-        yAxis: {
-          type: "value",
-          splitLine: { show: false },
-          axisLabel: { show: false },
-        },
-        series: [{ data: tuberiaMesesData, type: "bar", barWidth: "70%" }],
       },
       true,
     );
@@ -358,5 +381,68 @@
       },
       true,
     );
+
+    // El Treemap visualiza el estatus de la tubería
+    chartTuberiaEstatus.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          formatter: (p) => `${p.name}: ${formateadorMoneda.format(p.value)}`,
+        },
+        series: [
+          {
+            type: "treemap",
+            data: estatusData,
+            roam: false, // Deshabilitar zoom para mantener el grid estable
+            nodeClick: false,
+            breadcrumb: { show: false },
+            label: { show: true, formatter: "{b}\n{c}", color: "#fff" },
+            itemStyle: { borderColor: "#2b2b2b", borderWidth: 2 }, // Separador oscuro entre bloques
+          },
+        ],
+      },
+      true,
+    );
+  }
+
+  // 5. RENDERIZADO DE TABLA (GRID.JS)
+  function renderizarTablaGridJs() {
+    gridJsInstance = new gridjs.Grid({
+      columns: [
+        { id: "Marca", name: "Marca" },
+        { id: "Desarrollo", name: "Desarrollo" },
+        { id: "Unidad", name: "Unidad" },
+        { id: "Cliente", name: "Cliente" },
+        {
+          id: "PrecioVenta",
+          name: "Precio",
+          formatter: (cell) => formateadorMoneda.format(cell),
+        },
+        { id: "EstatusVenta", name: "Estatus" },
+        {
+          id: "FechaProceso",
+          name: "Fecha",
+          // Limpiar la fecha que llega de la fuente para visualización
+          formatter: (cell) => (cell ? cell.substring(0, 10) : "Sin Fecha"),
+        },
+      ],
+      data: DATOS_DESGLOSADOS,
+      search: true,
+      sort: true,
+      pagination: { limit: 30 },
+      language: {
+        search: { placeholder: "Buscar en todo el listado..." },
+        pagination: {
+          previous: "Anterior",
+          next: "Siguiente",
+          showing: "Mostrando",
+          results: () => "registros",
+        },
+      },
+      // Configuración estética para que coincida con el tema oscuro/claro
+      style: {
+        table: { "white-space": "nowrap" },
+      },
+    }).render(document.getElementById("contenedor-tabla"));
   }
 </script>
