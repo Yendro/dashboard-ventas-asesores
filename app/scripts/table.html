@@ -1,60 +1,58 @@
 <script>
-  function renderizarTablaGridJs() {
-    // Transformamos los objetos a un arreglo plano respetando todas las columnas del JSON
-    const matrizTabla = DATOS_DESGLOSADOS.map((fila) => [
-      String(fila.Asesor || "Sin Asesor"),
-      String(fila.Marca || "Sin Marca"),
-      String(fila.Desarrollo || "Sin Desarrollo"),
-      String(fila.Privada || "N/A"),
-      String(fila.Etapa || "N/A"),
-      String(fila.Unidad || "N/A"),
-      String(fila.Modelo || "N/A"),
-      Number(fila.M2 || 0).toFixed(2), // Limpia los ceros extra de los decimales
-      Number(fila.PrecioM2 || 0),
-      Number(fila.PrecioVenta || fila.f0_ || 0),
-      String(fila.Cliente || "Sin Cliente"),
-      String(fila.FechaProceso || "Sin Fecha").substring(0, 10),
-      String(fila.FechaFinalizado || "Sin Fecha").substring(0, 10),
-      String(fila.EstatusVenta || fila.Estatus || "Sin Estatus"),
-    ]);
+  function renderizarTabla() {
+    try {
+      // 1. Mapeo plano y seguro de las 14 columnas
+      const matrizTabla = DATOS_DESGLOSADOS.map((fila) => {
+        const precioM2 = Number(fila.PrecioM2) || 0;
+        const precioVenta = Number(fila.PrecioVenta || fila.f0_) || 0;
+        const metros = Number(fila.M2 || 0);
 
-    gridJsInstance = new gridjs.Grid({
-      columns: [
-        "Asesor",
-        "Marca",
-        "Desarrollo",
-        "Privada",
-        "Etapa",
-        "Unidad",
-        "Modelo",
-        "M2",
-        {
-          name: "Precio M2",
-          formatter: (cell) => formateadorMoneda.format(cell),
+        return [
+          String(fila.Asesor || "Sin Asesor"),
+          String(fila.Marca || "Sin Marca"),
+          String(fila.Desarrollo || "Sin Desarrollo"),
+          String(fila.Privada || "N/A"),
+          String(fila.Etapa || "N/A"),
+          String(fila.Unidad || "N/A"),
+          String(fila.Modelo || "N/A"),
+          metros.toFixed(2) + " m²",
+          formateadorMoneda.format(precioM2),
+          formateadorMoneda.format(precioVenta),
+          String(fila.Cliente || "Sin Cliente"),
+          String(fila.FechaProceso || "Sin Fecha").substring(0, 10),
+          String(fila.FechaFinalizado || "Sin Fecha").substring(0, 10),
+          String(fila.EstatusVenta || fila.Estatus || "Sin Estatus"),
+        ];
+      });
+
+      // 2. Estructura HTML requerida por DataTables
+      document.getElementById("contenedor-tabla").innerHTML = `
+        <table id="miTablaDashboard" class="display nowrap">
+          <thead>
+            <tr>
+              <th>Asesor</th><th>Marca</th><th>Desarrollo</th><th>Privada</th>
+              <th>Etapa</th><th>Unidad</th><th>Modelo</th><th>M2</th>
+              <th>Precio M2</th><th>Precio Venta</th><th>Cliente</th>
+              <th>Fecha Proceso</th><th>Fecha Finalizado</th><th>Estatus</th>
+            </tr>
+          </thead>
+        </table>
+      `;
+
+      // 3. Inicialización de DataTables
+      $("#miTablaDashboard").DataTable({
+        data: matrizTabla,
+        pageLength: 20,
+        scrollX: true, // Habilita scroll horizontal para acomodar las 14 columnas
+        language: {
+          url: "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json",
         },
-        {
-          name: "Precio Venta",
-          formatter: (cell) => formateadorMoneda.format(cell),
-        },
-        "Cliente",
-        "Fecha Proceso",
-        "Fecha Finalizado",
-        "Estatus Venta",
-      ],
-      data: matrizTabla,
-      search: true,
-      sort: true,
-      pagination: { limit: 30 },
-      language: {
-        search: { placeholder: "Buscar en todo el listado..." },
-        pagination: {
-          previous: "Anterior",
-          next: "Siguiente",
-          showing: "Mostrando",
-          results: () => "registros",
-        },
-      },
-      style: { table: { "white-space": "nowrap" } },
-    }).render(document.getElementById("contenedor-tabla"));
+        destroy: true, // Permite reinicializar la tabla si se llama a la función de nuevo
+      });
+    } catch (error) {
+      console.error("Error al construir la tabla:", error);
+      document.getElementById("contenedor-tabla").innerHTML =
+        `<div style="color: #e74c3c; padding: 20px; font-weight: bold;">Error al procesar los datos de la tabla: ${error.message}</div>`;
+    }
   }
 </script>

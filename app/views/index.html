@@ -7,16 +7,19 @@
 
     <!-- Librería ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <!-- Librería Grid.js -->
+
+    <!-- Librerías: jQuery y DataTables (Reemplazo de Grid.js) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <link
-      href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/gridjs/dist/gridjs.umd.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 
     <?!= HtmlService.createHtmlOutputFromFile('styles/dashboard').getContent();
     ?> <?!=
     HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('styles/tabla').getContent(); ?>
 
     <style>
       .oculto {
@@ -59,7 +62,7 @@
     </style>
   </head>
   <body>
-    <!-- Pantallas de estado -->
+    <!-- PANTALLA DE CARGA -->
     <div id="pantalla-carga">
       <div class="spinner"></div>
       <h2 style="margin-top: 20px; color: var(--text-main)">
@@ -67,6 +70,7 @@
       </h2>
     </div>
 
+    <!-- PANTALLA DE ERROR -->
     <div id="pantalla-error" class="oculto">
       <h1 style="color: var(--accent); font-size: 4rem; margin: 0">!</h1>
       <h2 id="mensaje-error" style="color: var(--text-main)">
@@ -75,11 +79,12 @@
     </div>
 
     <div id="app-container" class="oculto">
+      <!-- CABECERA -->
       <header>
         <div class="header-left">
           <div class="logo-container">
             <img
-              src="https://raw.githubusercontent.com/Yendro/dashboard-ventas-asesores/main/app/img/glr-solo-mitad.png"
+              src="https://raw.githubusercontent.com/Yendro/dashboard-ventas-asesores/main/app/img/glr-solo.png"
               id="logo-empresa"
               alt="Logo"
               onerror="this.style.display = 'none'"
@@ -88,7 +93,7 @@
           <div>
             <h1>Ventas por Asesores</h1>
             <span class="subtitle"
-              >General: <span id="nombre-asesor">Cargando...</span></span
+              >Asesor: <span id="nombre-asesor">Cargando...</span></span
             >
           </div>
         </div>
@@ -103,6 +108,7 @@
         </div>
       </header>
 
+      <!-- VISTA 1: TABLERO DE ECHARTS -->
       <section id="vista-dashboard" class="vista-wrapper">
         <main class="dashboard-grid">
           <div class="card kpi">
@@ -144,6 +150,7 @@
         </main>
       </section>
 
+      <!-- VISTA 2: TABLA -->
       <section id="vista-tabla" class="vista-wrapper oculto">
         <div id="contenedor-tabla"></div>
       </section>
@@ -153,7 +160,7 @@
     <script>
       const TOKEN_URL = "<?= token ?>";
       let DATOS_DESGLOSADOS = [];
-      let gridJsInstance = null;
+      let tablaRenderizada = false; // Bandera de estado para la tabla
 
       const formateadorMoneda = new Intl.NumberFormat("es-MX", {
         style: "currency",
@@ -162,7 +169,7 @@
       });
     </script>
 
-    <!-- SCRIPTS -->
+    <!-- INYECCIÓN DE MÓDULOS SEPARADOS -->
     <?!= HtmlService.createHtmlOutputFromFile('scripts/charts').getContent(); ?>
     <?!= HtmlService.createHtmlOutputFromFile('scripts/table').getContent(); ?>
   </body>

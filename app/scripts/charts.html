@@ -34,8 +34,10 @@
       btnTabla.classList.add("activo");
       btnDashboard.classList.remove("activo");
 
-      if (!gridJsInstance && typeof renderizarTablaGridJs === "function") {
-        renderizarTablaGridJs();
+      // Llamada al módulo de DataTables
+      if (!tablaRenderizada && typeof renderizarTabla === "function") {
+        renderizarTabla();
+        tablaRenderizada = true;
       }
     });
 

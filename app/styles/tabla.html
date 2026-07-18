@@ -1,0 +1,39 @@
+<style>
+  /* Integración de DataTables al Tema Oscuro */
+  #miTablaDashboard {
+    color: #ecf0f1;
+    width: 100%;
+  }
+  #miTablaDashboard tbody tr {
+    background-color: var(--card-bg);
+    transition: background-color 0.2s;
+  }
+  #miTablaDashboard tbody tr:hover {
+    background-color: #4a4a4a;
+  }
+  #miTablaDashboard th {
+    border-bottom: 2px solid var(--accent);
+    color: var(--accent);
+  }
+  #miTablaDashboard td {
+    border-bottom: 1px solid #4a4a4a;
+  }
+
+  /* Ajustes de controles (Buscador y Paginación) */
+  .dataTables_wrapper .dataTables_length,
+  .dataTables_wrapper .dataTables_filter,
+  .dataTables_wrapper .dataTables_info,
+  .dataTables_wrapper .dataTables_paginate,
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: #ecf0f1 !important;
+  }
+
+  .dataTables_wrapper .dataTables_filter input,
+  .dataTables_wrapper .dataTables_length select {
+    background-color: var(--bg-dark);
+    color: #ecf0f1;
+    border: 1px solid #a0a0a0;
+    border-radius: 4px;
+    padding: 4px;
+  }
+</style>
