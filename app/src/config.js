@@ -18,11 +18,7 @@ function inicializarEntorno() {
   const carpeta = DriveApp.getFolderById(carpetaId);
 
   // 2. Nombres exactos de los archivos generados por Python
-  const archivosRequeridos = [
-    "ventas_agrupadas.json",
-    "ventas_desglosadas.json",
-    "config.json",
-  ];
+  const archivosRequeridos = ["ventas_desglosadas.json", "config.json"];
 
   // 3. Buscar y guardar los IDs de los archivos
   archivosRequeridos.forEach((nombreArchivo) => {
