@@ -4,12 +4,13 @@ WITH Ventas_Portal_Asesores AS (
     TRIM(CONCAT(ext.DesarrolloLargo, ' ', ext.Unidad)) AS id,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) AS Asesor,
     d.Marca, ext.Desarrollo,
-    NULLIF(TRIM(ext.Privada), 'N/A') AS Privada,
-    NULLIF(TRIM(ext.Etapa), 'N/A') AS Etapa, ext.Unidad,
-    NULLIF(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
-    ext.M2, SAFE_DIVIDE(ext.PrecioVenta, ext.M2) AS PrecioM2, ext.PrecioVenta,
-    INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')) AS Cliente,
-    ext.FechaProceso, ext.FechaFinalizado,
+    COALESCE(ext.Privada, 'N/A') AS Privada,
+    COALESCE(ext.Etapa, 'N/A') AS Etapa, ext.Unidad,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Modelo), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
+    ext.M2, COALESCE(SAFE_DIVIDE(ext.PrecioVenta, ext.M2), 0) AS PrecioM2,
+    COALESCE(ext.PrecioVenta, 0) AS PrecioVenta,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')), "N/A") AS Cliente,
+    ext.FechaProceso, COALESCE(ext.FechaFinalizado, ext.FechaProceso) AS FechaFinalizado,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.EstatusVenta), NFKD),r'\pM', '')) AS EstatusVenta,
     ext.Estatus
   FROM EXTERNAL_QUERY("terraviva-439415.us.terraviva", """
@@ -47,12 +48,13 @@ WITH Ventas_Portal_Asesores AS (
     TRIM(CONCAT(ext.DesarrolloLargo, ' ', ext.Unidad)) AS id,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) AS Asesor,
     d.Marca, ext.Desarrollo,
-    NULLIF(TRIM(ext.Privada), 'N/A') AS Privada,
-    NULLIF(TRIM(ext.Etapa), 'N/A') AS Etapa, ext.Unidad,
-    NULLIF(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
-    ext.M2, SAFE_DIVIDE(ext.PrecioVenta, ext.M2) AS PrecioM2, ext.PrecioVenta,
-    INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')) AS Cliente,
-    ext.FechaProceso, ext.FechaFinalizado,
+    COALESCE(ext.Privada, 'N/A') AS Privada,
+    COALESCE(ext.Etapa, 'N/A') AS Etapa, ext.Unidad,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Modelo), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
+    ext.M2, COALESCE(SAFE_DIVIDE(ext.PrecioVenta, ext.M2), 0) AS PrecioM2,
+    COALESCE(ext.PrecioVenta, 0) AS PrecioVenta,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')), "N/A") AS Cliente,
+    ext.FechaProceso, COALESCE(ext.FechaFinalizado, ext.FechaProceso) AS FechaFinalizado,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.EstatusVenta), NFKD),r'\pM', '')) AS EstatusVenta,
     ext.Estatus
   FROM EXTERNAL_QUERY("terraviva-439415.us.dam", """
@@ -90,15 +92,16 @@ WITH Ventas_Portal_Asesores AS (
     TRIM(CONCAT(ext.DesarrolloLargo, ' ', ext.Unidad)) AS id,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) AS Asesor,
     d.Marca, ext.Desarrollo,
-    NULLIF(TRIM(ext.Privada), 'N/A') AS Privada,
-    NULLIF(TRIM(ext.Etapa), 'N/A') AS Etapa, ext.Unidad,
-    NULLIF(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
-    ext.M2, SAFE_DIVIDE(ext.PrecioVenta, ext.M2) AS PrecioM2, ext.PrecioVenta,
-    INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')) AS Cliente,
-    ext.FechaProceso, ext.FechaFinalizado,
+    COALESCE(ext.Privada, 'N/A') AS Privada,
+    COALESCE(ext.Etapa, 'N/A') AS Etapa, ext.Unidad,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Modelo), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
+    ext.M2, COALESCE(SAFE_DIVIDE(ext.PrecioVenta, ext.M2), 0) AS PrecioM2,
+    COALESCE(ext.PrecioVenta, 0) AS PrecioVenta,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')), "N/A") AS Cliente,
+    ext.FechaProceso, COALESCE(ext.FechaFinalizado, ext.FechaProceso) AS FechaFinalizado,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.EstatusVenta), NFKD),r'\pM', '')) AS EstatusVenta,
     ext.Estatus
-  FROM EXTERNAL_QUERY("terraviva-439415.us.dam", """
+  FROM EXTERNAL_QUERY("terraviva-439415.us.custo", """
     SELECT
       v.id_venta,
       v.precio_venta AS PrecioVenta,
@@ -133,15 +136,16 @@ WITH Ventas_Portal_Asesores AS (
     TRIM(CONCAT(ext.DesarrolloLargo, ' ', ext.Unidad)) AS id,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) AS Asesor,
     d.Marca, ext.Desarrollo,
-    NULLIF(TRIM(ext.Privada), 'N/A') AS Privada,
-    NULLIF(TRIM(ext.Etapa), 'N/A') AS Etapa, ext.Unidad,
-    NULLIF(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Asesor), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
-    ext.M2, SAFE_DIVIDE(ext.PrecioVenta, ext.M2) AS PrecioM2, ext.PrecioVenta,
-    INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')) AS Cliente,
-    ext.FechaProceso, ext.FechaFinalizado,
+    COALESCE(ext.Privada, 'N/A') AS Privada,
+    COALESCE(ext.Etapa, 'N/A') AS Etapa, ext.Unidad,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Modelo), NFKD),r'\pM', '')) , 'N/A') AS Modelo,
+    ext.M2, COALESCE(SAFE_DIVIDE(ext.PrecioVenta, ext.M2), 0) AS PrecioM2,
+    COALESCE(ext.PrecioVenta, 0) AS PrecioVenta,
+    COALESCE(INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.Cliente), NFKD),r'\pM', '')), "N/A") AS Cliente,
+    ext.FechaProceso, COALESCE(ext.FechaFinalizado, ext.FechaProceso) AS FechaFinalizado,
     INITCAP(REGEXP_REPLACE(NORMALIZE(TRIM(ext.EstatusVenta), NFKD),r'\pM', '')) AS EstatusVenta,
     ext.Estatus
-  FROM EXTERNAL_QUERY("terraviva-439415.us.dam", """
+  FROM EXTERNAL_QUERY("terraviva-439415.us.bq_almaviva", """
     SELECT
       v.id_venta,
       v.precio_venta AS PrecioVenta,
@@ -173,7 +177,7 @@ WITH Ventas_Portal_Asesores AS (
 SELECT * EXCEPT(id, Estatus) FROM Ventas_Portal_Asesores
 WHERE FechaProceso >= DATE_SUB(
   DATE_TRUNC(CURRENT_DATE("America/Merida"), YEAR), 
-  INTERVAL 1 MONTH
+  INTERVAL 1 YEAR
 )
 AND Asesor IN (
   -- Liliana Reyes
