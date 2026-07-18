@@ -6,25 +6,15 @@
     "#e0847b",
     "#b54b42",
   ];
-
-  // Utilidad para formatear números a moneda (MXN)
-  const formateadorMoneda = new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    maximumFractionDigits: 0,
-  });
-
-  // Variables globales
   let myCharts = [];
   let chartVentasMeses,
     chartMarcas,
     chartDesarrollo,
     chartArbol,
     chartTuberiaEstatus;
-  let gridJsInstance = null;
 
   document.addEventListener("DOMContentLoaded", () => {
-    // 1. NAVEGACIÓN Y EVENT LISTENERS
+    // NAVEGACIÓN
     const btnDashboard = document.getElementById("btn-dashboard");
     const btnTabla = document.getElementById("btn-tabla");
     const vistaDashboard = document.getElementById("vista-dashboard");
@@ -44,7 +34,7 @@
       btnTabla.classList.add("activo");
       btnDashboard.classList.remove("activo");
 
-      if (!gridJsInstance) {
+      if (!gridJsInstance && typeof renderizarTablaGridJs === "function") {
         renderizarTablaGridJs();
       }
     });
@@ -56,7 +46,7 @@
       .getElementById("fecha-fin")
       .addEventListener("change", renderizarDashboard);
 
-    // 2. PETICIÓN ASÍNCRONA AL BACKEND
+    // PETICIÓN ASÍNCRONA
     google.script.run
       .withSuccessHandler((respuesta) => {
         if (respuesta.error) {
@@ -68,7 +58,6 @@
 
         DATOS_DESGLOSADOS = respuesta.datos;
         document.getElementById("nombre-asesor").innerText = respuesta.asesor;
-
         document.getElementById("pantalla-carga").classList.add("oculto");
         document.getElementById("app-container").classList.remove("oculto");
 
@@ -85,7 +74,6 @@
       .obtenerDatosAsesor(TOKEN_URL);
   });
 
-  // 3. INICIALIZACIÓN DE GRÁFICOS
   function inicializarGraficos() {
     chartVentasMeses = echarts.init(
       document.getElementById("chart-ventas-meses"),
@@ -104,13 +92,11 @@
       chartMarcas,
       chartTuberiaEstatus,
     );
-
     window.addEventListener("resize", () => {
       myCharts.forEach((chart) => chart.resize());
     });
   }
 
-  // 4. PROCESAMIENTO Y RENDERIZADO DEL DASHBOARD
   function renderizarDashboard() {
     const fInicio = document.getElementById("fecha-inicio").value;
     const fFin = document.getElementById("fecha-fin").value;
@@ -123,7 +109,6 @@
       arbol: {},
       tuberiaEstatus: {},
     };
-
     const mesesOrden = [
       "ene",
       "feb",
@@ -140,9 +125,7 @@
     ];
     mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
 
-    // Filtrar primero el arreglo maestro
     const datosFiltrados = DATOS_DESGLOSADOS.filter((fila) => {
-      // CORRECCIÓN 1: Detección flexible de estatus (Captura Finalizado, Finalizadas, Finalizada Y Liquidada, etc)
       const estatusTexto = String(
         fila.EstatusVenta || fila.Estatus || "",
       ).toUpperCase();
@@ -150,12 +133,11 @@
         fila.Estatus === 7 ||
         fila.Estatus === 8 ||
         estatusTexto.includes("FINALIZAD");
-
       const fechaString = esFinalizado
         ? fila.FechaFinalizado || fila.FechaProceso
         : fila.FechaProceso;
-      if (!fechaString) return false;
 
+      if (!fechaString) return false;
       const fechaFila = String(fechaString).substring(0, 10);
 
       if (fInicio && fechaFila < fInicio) return false;
@@ -163,21 +145,22 @@
       return true;
     });
 
-    // Iterar sobre los datos ya filtrados
     datosFiltrados.forEach((fila) => {
-      const precio = Number(fila.PrecioVenta) || 0;
-      const unidades = Number(fila.Unidades || fila.M2 || 1);
+      const precio = Number(fila.PrecioVenta || fila.f0_) || 0;
+      const unidades = 1;
       const marca = fila.Marca || "Sin Marca";
       const desarrollo = fila.Desarrollo || "Sin Desarrollo";
       const estatusNombre = fila.EstatusVenta || fila.Estatus || "En Proceso";
-
       const estatusTexto = String(
         fila.EstatusVenta || fila.Estatus || "",
       ).toUpperCase();
+
       const esFinalizado =
         fila.Estatus === 7 ||
         fila.Estatus === 8 ||
         estatusTexto.includes("FINALIZAD");
+      const esCancelado =
+        fila.Estatus === 1 || estatusTexto.includes("CANCELAD");
 
       const fechaString = esFinalizado
         ? fila.FechaFinalizado || fila.FechaProceso
@@ -203,7 +186,7 @@
         resumen.arbol[marca].total += precio;
         resumen.arbol[marca].desarrollos[desarrollo] =
           (resumen.arbol[marca].desarrollos[desarrollo] || 0) + precio;
-      } else {
+      } else if (!esCancelado) {
         kpi.tuberia += precio;
         kpi.tuberiaUnidades += unidades;
         resumen.tuberiaEstatus[estatusNombre] =
@@ -229,7 +212,6 @@
       .map((k) => ({ name: k, value: resumen.ventasPorDesarrollo[k] }))
       .filter((i) => i.value > 0)
       .sort((a, b) => a.value - b.value);
-
     const estatusData = Object.keys(resumen.tuberiaEstatus)
       .map((k) => ({ name: k, value: resumen.tuberiaEstatus[k] }))
       .filter((i) => i.value > 0);
@@ -246,7 +228,6 @@
       })),
     };
 
-    // CORRECCIÓN 2: Optimización de paddings (grid) para llenar tarjetas
     chartVentasMeses.setOption(
       {
         color: coloresDashboard,
@@ -345,7 +326,7 @@
             top: "0%",
             bottom: "0%",
             left: "10%",
-            right: "20%", // Más ancho
+            right: "20%",
             symbolSize: 8,
             itemStyle: { color: "#eb6c61", borderColor: "#eb6c61" },
             label: {
@@ -385,7 +366,7 @@
             top: 10,
             bottom: 0,
             left: 0,
-            right: 0, // Fuerza al Treemap a tocar los bordes
+            right: 0,
             roam: false,
             nodeClick: false,
             breadcrumb: { show: false },
@@ -396,52 +377,5 @@
       },
       true,
     );
-  }
-
-  // CORRECCIÓN 3: Reestructuración de Grid.js con Array plano para evitar errores de renderizado
-  function renderizarTablaGridJs() {
-    // Mapeamos los objetos de forma segura a un arreglo simple
-    const datosTabla = DATOS_DESGLOSADOS.map((fila) => [
-      fila.Marca || "Sin Marca",
-      fila.Desarrollo || "Sin Desarrollo",
-      fila.Unidad || "N/A",
-      fila.Cliente || "Sin Cliente",
-      Number(fila.PrecioVenta) || 0,
-      fila.EstatusVenta || fila.Estatus || "Sin Estatus",
-      fila.FechaProceso || fila.FechaFinalizado || "Sin Fecha",
-    ]);
-
-    gridJsInstance = new gridjs.Grid({
-      columns: [
-        "Marca",
-        "Desarrollo",
-        "Unidad",
-        "Cliente",
-        {
-          name: "Precio",
-          formatter: (cell) => formateadorMoneda.format(cell),
-        },
-        "Estatus",
-        {
-          name: "Fecha",
-          formatter: (cell) =>
-            cell !== "Sin Fecha" ? String(cell).substring(0, 10) : cell,
-        },
-      ],
-      data: datosTabla,
-      search: true,
-      sort: true,
-      pagination: { limit: 30 },
-      language: {
-        search: { placeholder: "Buscar en todo el listado..." },
-        pagination: {
-          previous: "Anterior",
-          next: "Siguiente",
-          showing: "Mostrando",
-          results: () => "registros",
-        },
-      },
-      style: { table: { "white-space": "nowrap" } },
-    }).render(document.getElementById("contenedor-tabla"));
   }
 </script>

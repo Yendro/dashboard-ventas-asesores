@@ -7,7 +7,7 @@
 
     <!-- Librería ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <!-- Librería Grid.js (Esencial para la vista de tabla) -->
+    <!-- Librería Grid.js -->
     <link
       href="https://cdn.jsdelivr.net/npm/gridjs/dist/theme/mermaid.min.css"
       rel="stylesheet"
@@ -19,11 +19,9 @@
     HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent(); ?>
 
     <style>
-      /* Estilos para la navegación y las vistas */
       .oculto {
         display: none !important;
       }
-
       nav {
         display: flex;
         gap: 10px;
@@ -44,15 +42,12 @@
         background-color: var(--accent);
         color: white;
       }
-
-      /* Contenedores para dividir el Tablero de la Tabla */
       .vista-wrapper {
         flex-grow: 1;
         display: flex;
         flex-direction: column;
         min-height: 0;
       }
-
       #contenedor-tabla {
         background: var(--card-bg);
         padding: 15px;
@@ -64,7 +59,7 @@
     </style>
   </head>
   <body>
-    <!-- PANTALLA DE CARGA -->
+    <!-- Pantallas de estado -->
     <div id="pantalla-carga">
       <div class="spinner"></div>
       <h2 style="margin-top: 20px; color: var(--text-main)">
@@ -72,7 +67,6 @@
       </h2>
     </div>
 
-    <!-- PANTALLA DE ERROR -->
     <div id="pantalla-error" class="oculto">
       <h1 style="color: var(--accent); font-size: 4rem; margin: 0">!</h1>
       <h2 id="mensaje-error" style="color: var(--text-main)">
@@ -81,13 +75,11 @@
     </div>
 
     <div id="app-container" class="oculto">
-      <!-- CABECERA -->
       <header>
         <div class="header-left">
-          <!-- LOGO -->
           <div class="logo-container">
             <img
-              src="https://raw.githubusercontent.com/Yendro/dashboard-ventas-asesores/main/app/img/glr-solo.png"
+              src="https://raw.githubusercontent.com/Yendro/dashboard-ventas-asesores/main/app/img/glr-solo-mitad.png"
               id="logo-empresa"
               alt="Logo"
               onerror="this.style.display = 'none'"
@@ -100,13 +92,10 @@
             >
           </div>
         </div>
-
-        <!-- NAVEGACIÓN -->
         <nav>
           <button id="btn-dashboard" class="activo">Ver Tablero</button>
           <button id="btn-tabla">Ver Listado</button>
         </nav>
-
         <div class="date-filters">
           <label>Fecha:</label>
           <input type="date" id="fecha-inicio" />
@@ -114,7 +103,6 @@
         </div>
       </header>
 
-      <!-- VISTA 1: TABLERO DE ECHARTS -->
       <section id="vista-dashboard" class="vista-wrapper">
         <main class="dashboard-grid">
           <div class="card kpi">
@@ -156,18 +144,26 @@
         </main>
       </section>
 
-      <!-- VISTA 2: TABLA DE GRID.JS -->
       <section id="vista-tabla" class="vista-wrapper oculto">
         <div id="contenedor-tabla"></div>
       </section>
     </div>
 
-    <!-- INYECCIÓN DEL TOKEN -->
+    <!-- VARIABLES GLOBALES DE ESTADO -->
     <script>
       const TOKEN_URL = "<?= token ?>";
-      let DATOS_DESGLOSADOS = []; // Se llenará asíncronamente
+      let DATOS_DESGLOSADOS = [];
+      let gridJsInstance = null;
+
+      const formateadorMoneda = new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN",
+        maximumFractionDigits: 0,
+      });
     </script>
 
+    <!-- SCRIPTS -->
     <?!= HtmlService.createHtmlOutputFromFile('scripts/charts').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('scripts/table').getContent(); ?>
   </body>
 </html>
