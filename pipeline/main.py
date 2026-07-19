@@ -29,7 +29,6 @@ def update_data():
 
     # 2. Transformación a JSON 
     logger.info("Transformando datos a formato JSON...")
-    ruta_agrupadas = OUTPUT_DIR / "ventas_agrupadas.json"
     ruta_desglosadas = OUTPUT_DIR / "ventas_desglosadas.json"
     
     try:
@@ -37,7 +36,7 @@ def update_data():
         logger.info("✓ Archivos JSON generados correctamente.")
     except Exception as e:
         logger.error(f"✗ Error crítico al transformar los DataFrames a JSON: {str(e)}")
-        raise typer.Exit(code=1) # Detenemos la ejecución para no subir archivos corruptos
+        raise typer.Exit(code=1) 
 
     # 3. Gestión de Tokens
     logger.info("Gestionando tokens de asesores...")
@@ -57,15 +56,22 @@ def update_data():
     logger.info("Subiendo archivos a Google Drive...")
     try:
         drive_client = DriveClient()
-        archivos_a_subir = [ruta_agrupadas, ruta_desglosadas, OUTPUT_DIR / "config.json"]
+        archivos_a_subir = [ruta_desglosadas, OUTPUT_DIR / "config.json"]
         
+        hubo_alertas = False
         for archivo in archivos_a_subir:
             if archivo.exists():
-                drive_client.subir_archivo(archivo)
+                exito = drive_client.subir_archivo(archivo)
+                if not exito:
+                    hubo_alertas = True
                 
-        logger.info("--- Pipeline finalizada con éxito ---")
+        if hubo_alertas:
+            logger.warning("--- Pipeline finalizada con algunas alertas (ver arriba) ---")
+        else:
+            logger.info("--- Pipeline finalizada con éxito ---")
+            
     except Exception as e:
-        logger.error(f"✗ Error durante la carga de archivos a Drive: {str(e)}")
+        logger.error(f"✗ Error durante la conexión general a Drive: {str(e)}")
         raise typer.Exit(code=1)
 
 @app.command()
@@ -76,26 +82,21 @@ def verify_tokens():
     logger.info("--- Iniciando verificación de tokens ---")
     
     try:
-        # 1. Extracción (Necesitamos la lista actualizada de asesores)
         bq_client = BigQueryClient()
         dataframes = bq_client.ejecutar_todas_consultas()
-        
         df_desglosadas = dataframes.get('ventas_desglosadas')
         
         if df_desglosadas is None:
              logger.error("Falta la consulta de ventas_desglosadas en data/src.")
              raise typer.Exit(code=1)
 
-        # 2. Gestión de Tokens
         logger.info("Revisando nuevos asesores para generación de tokens...")
         if 'Asesor' in df_desglosadas.columns:
             asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
             token_mgr = TokenManager(OUTPUT_DIR)
             
-            # Recordar que actualizar_tokens retorna True si asignó UUIDs nuevos
             hubo_cambios = token_mgr.actualizar_tokens(asesores_unicos)
             
-            # 3. Carga selectiva a Drive
             if hubo_cambios:
                 logger.info("Se detectaron nuevos asesores. Subiendo config.json a Drive...")
                 drive_client = DriveClient()
