@@ -1,8 +1,23 @@
 <script>
   function renderizarTabla() {
     try {
-      // 1. Mapeo plano y seguro de las 14 columnas
-      const matrizTabla = DATOS_DESGLOSADOS.map((fila) => {
+      // 1. Obtener los valores actuales del calendario
+      const fechaInicio = document.getElementById("fecha-inicio").value;
+      const fechaFin = document.getElementById("fecha-fin").value;
+
+      // 2. Filtrar los datos maestos estrictamente por FechaProceso
+      const datosFiltradosTabla = DATOS_DESGLOSADOS.filter((fila) => {
+        const fechaProceso = String(fila.FechaProceso || "").substring(0, 10);
+        if (!fechaProceso) return false;
+
+        if (fechaInicio && fechaProceso < fechaInicio) return false;
+        if (fechaFin && fechaProceso > fechaFin) return false;
+
+        return true;
+      });
+
+      // 3. Mapear los datos filtrados a la matriz requerida por DataTables
+      const matrizTabla = datosFiltradosTabla.map((fila) => {
         const precioM2 = Number(fila.PrecioM2) || 0;
         const precioVenta = Number(fila.PrecioVenta || fila.f0_) || 0;
         const metros = Number(fila.M2 || 0);
@@ -25,7 +40,7 @@
         ];
       });
 
-      // 2. Estructura HTML requerida por DataTables
+      // 4. Re-inyectar estructura HTML para limpieza profunda
       document.getElementById("contenedor-tabla").innerHTML = `
         <table id="miTablaDashboard" class="display nowrap">
           <thead>
@@ -39,15 +54,15 @@
         </table>
       `;
 
-      // 3. Inicialización de DataTables
+      // 5. Inicializar o Re-inicializar DataTables
       $("#miTablaDashboard").DataTable({
         data: matrizTabla,
         pageLength: 20,
-        scrollX: true, // Habilita scroll horizontal para acomodar las 14 columnas
+        scrollX: true,
         language: {
           url: "https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json",
         },
-        destroy: true, // Permite reinicializar la tabla si se llama a la función de nuevo
+        destroy: true,
       });
     } catch (error) {
       console.error("Error al construir la tabla:", error);

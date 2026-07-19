@@ -8,7 +8,7 @@
     <!-- Librería ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 
-    <!-- Librerías: jQuery y DataTables (Reemplazo de Grid.js) -->
+    <!-- Librerías: jQuery y DataTables -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <link
       href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
@@ -19,7 +19,6 @@
     <?!= HtmlService.createHtmlOutputFromFile('styles/dashboard').getContent();
     ?> <?!=
     HtmlService.createHtmlOutputFromFile('styles/cabecera').getContent(); ?>
-    <?!= HtmlService.createHtmlOutputFromFile('styles/tabla').getContent(); ?>
 
     <style>
       .oculto {
@@ -93,7 +92,7 @@
           <div>
             <h1>Ventas por Asesores</h1>
             <span class="subtitle"
-              >Asesor: <span id="nombre-asesor">Cargando...</span></span
+              >General: <span id="nombre-asesor">Cargando...</span></span
             >
           </div>
         </div>
@@ -111,6 +110,7 @@
       <!-- VISTA 1: TABLERO DE ECHARTS -->
       <section id="vista-dashboard" class="vista-wrapper">
         <main class="dashboard-grid">
+          <!-- Fila 1 -->
           <div class="card kpi">
             <div class="kpi-title">Ventas</div>
             <div class="kpi-value" id="kpi-ventas">$0</div>
@@ -127,6 +127,7 @@
             <div class="kpi-title">Unidades</div>
             <div class="kpi-value" id="kpi-tuberia-unidades">0</div>
           </div>
+          <!-- Fila 2 -->
           <div class="card chart-span-2">
             <div class="chart-title">Ventas por mes</div>
             <div id="chart-ventas-meses" class="echart-container"></div>
@@ -135,6 +136,7 @@
             <div class="chart-title">Desglose (Marca / Desarrollo)</div>
             <div id="chart-arbol" class="echart-container"></div>
           </div>
+          <!-- Fila 3: Ajustada a 4 tarjetas de 1 columna -->
           <div class="card chart-span-1">
             <div class="chart-title">Ventas por desarrollo</div>
             <div id="chart-desarrollo" class="echart-container"></div>
@@ -143,9 +145,13 @@
             <div class="chart-title">Distribución por marca</div>
             <div id="chart-marcas" class="echart-container"></div>
           </div>
-          <div class="card chart-span-2">
+          <div class="card chart-span-1">
             <div class="chart-title">Tubería por estatus</div>
             <div id="chart-tuberia-estatus" class="echart-container"></div>
+          </div>
+          <div class="card chart-span-1">
+            <div class="chart-title">Tubería por mes</div>
+            <div id="chart-tuberia-meses" class="echart-container"></div>
           </div>
         </main>
       </section>
@@ -160,7 +166,7 @@
     <script>
       const TOKEN_URL = "<?= token ?>";
       let DATOS_DESGLOSADOS = [];
-      let tablaRenderizada = false; // Bandera de estado para la tabla
+      let tablaRenderizada = false;
 
       const formateadorMoneda = new Intl.NumberFormat("es-MX", {
         style: "currency",
@@ -169,7 +175,7 @@
       });
     </script>
 
-    <!-- INYECCIÓN DE MÓDULOS SEPARADOS -->
+    <!-- INYECCIÓN DE MÓDULOS -->
     <?!= HtmlService.createHtmlOutputFromFile('scripts/charts').getContent(); ?>
     <?!= HtmlService.createHtmlOutputFromFile('scripts/table').getContent(); ?>
   </body>

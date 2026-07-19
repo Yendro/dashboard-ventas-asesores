@@ -11,7 +11,8 @@
     chartMarcas,
     chartDesarrollo,
     chartArbol,
-    chartTuberiaEstatus;
+    chartTuberiaEstatus,
+    chartTuberiaMeses;
 
   document.addEventListener("DOMContentLoaded", () => {
     // NAVEGACIÓN
@@ -34,7 +35,6 @@
       btnTabla.classList.add("activo");
       btnDashboard.classList.remove("activo");
 
-      // Llamada al módulo de DataTables
       if (!tablaRenderizada && typeof renderizarTabla === "function") {
         renderizarTabla();
         tablaRenderizada = true;
@@ -86,6 +86,9 @@
     chartTuberiaEstatus = echarts.init(
       document.getElementById("chart-tuberia-estatus"),
     );
+    chartTuberiaMeses = echarts.init(
+      document.getElementById("chart-tuberia-meses"),
+    ); // Nueva gráfica
 
     myCharts.push(
       chartVentasMeses,
@@ -93,6 +96,7 @@
       chartDesarrollo,
       chartMarcas,
       chartTuberiaEstatus,
+      chartTuberiaMeses,
     );
     window.addEventListener("resize", () => {
       myCharts.forEach((chart) => chart.resize());
@@ -110,6 +114,7 @@
       ventasPorDesarrollo: {},
       arbol: {},
       tuberiaEstatus: {},
+      tuberiaPorMes: {},
     };
     const mesesOrden = [
       "ene",
@@ -125,7 +130,11 @@
       "nov",
       "dic",
     ];
-    mesesOrden.forEach((m) => (resumen.ventasPorMes[m] = 0));
+
+    mesesOrden.forEach((m) => {
+      resumen.ventasPorMes[m] = 0;
+      resumen.tuberiaPorMes[m] = 0; // Inicializar meses para tubería
+    });
 
     const datosFiltrados = DATOS_DESGLOSADOS.filter((fila) => {
       const estatusTexto = String(
@@ -164,11 +173,12 @@
       const esCancelado =
         fila.Estatus === 1 || estatusTexto.includes("CANCELAD");
 
-      const fechaString = esFinalizado
+      // Para ventas cerradas evaluamos su fecha de cierre. Para tubería, evaluamos la fecha de proceso.
+      const fechaFinal = esFinalizado
         ? fila.FechaFinalizado || fila.FechaProceso
         : fila.FechaProceso;
-      const fechaObj = new Date(fechaString);
-      const mesCorto = fechaObj
+      const dateFinal = new Date(fechaFinal);
+      const mesCortoFinal = dateFinal
         .toLocaleString("es-ES", { month: "short", timeZone: "UTC" })
         .toLowerCase()
         .replace(".", "");
@@ -176,8 +186,8 @@
       if (esFinalizado) {
         kpi.ventas += precio;
         kpi.unidades += unidades;
-        if (resumen.ventasPorMes[mesCorto] !== undefined)
-          resumen.ventasPorMes[mesCorto] += precio;
+        if (resumen.ventasPorMes[mesCortoFinal] !== undefined)
+          resumen.ventasPorMes[mesCortoFinal] += precio;
         resumen.ventasPorMarca[marca] =
           (resumen.ventasPorMarca[marca] || 0) + precio;
         resumen.ventasPorDesarrollo[desarrollo] =
@@ -193,6 +203,19 @@
         kpi.tuberiaUnidades += unidades;
         resumen.tuberiaEstatus[estatusNombre] =
           (resumen.tuberiaEstatus[estatusNombre] || 0) + precio;
+
+        // Tubería por mes (Agrupada estrictamente por FechaProceso)
+        const fechaProcStr = String(fila.FechaProceso || "").substring(0, 10);
+        if (fechaProcStr) {
+          const dateProc = new Date(fechaProcStr);
+          const mesCortoProc = dateProc
+            .toLocaleString("es-ES", { month: "short", timeZone: "UTC" })
+            .toLowerCase()
+            .replace(".", "");
+          if (resumen.tuberiaPorMes[mesCortoProc] !== undefined) {
+            resumen.tuberiaPorMes[mesCortoProc] += precio;
+          }
+        }
       }
     });
 
@@ -207,6 +230,8 @@
       kpi.tuberiaUnidades.toLocaleString("es-MX");
 
     const ventasMesesData = mesesOrden.map((m) => resumen.ventasPorMes[m]);
+    const tuberiaMesesData = mesesOrden.map((m) => resumen.tuberiaPorMes[m]); // Data para nueva gráfica
+
     const marcasData = Object.keys(resumen.ventasPorMarca)
       .map((k) => ({ name: k, value: resumen.ventasPorMarca[k] }))
       .filter((i) => i.value > 0);
@@ -252,6 +277,32 @@
           axisLabel: { show: false },
         },
         series: [{ data: ventasMesesData, type: "bar", barWidth: "70%" }],
+      },
+      true,
+    );
+
+    chartTuberiaMeses.setOption(
+      {
+        color: coloresDashboard,
+        tooltip: {
+          trigger: "axis",
+          formatter: (p) =>
+            `${p[0].name}: ${formateadorMoneda.format(p[0].value)}`,
+        },
+        grid: { top: 10, right: 0, bottom: 0, left: 0, containLabel: true },
+        xAxis: {
+          type: "category",
+          data: mesesOrden,
+          axisLabel: { color: "#a0a0a0" },
+          axisLine: { show: false },
+          axisTick: { show: false },
+        },
+        yAxis: {
+          type: "value",
+          splitLine: { show: false },
+          axisLabel: { show: false },
+        },
+        series: [{ data: tuberiaMesesData, type: "bar", barWidth: "70%" }],
       },
       true,
     );
@@ -379,5 +430,10 @@
       },
       true,
     );
+
+    // Sincronizar la tabla si ya se ha visitado la vista "Listado"
+    if (tablaRenderizada && typeof renderizarTabla === "function") {
+      renderizarTabla();
+    }
   }
 </script>
