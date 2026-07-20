@@ -501,6 +501,7 @@ dependencies = [
     { name = "google-cloud-bigquery-storage" },
     { name = "pandas" },
     { name = "python-dotenv" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -512,6 +513,7 @@ requires-dist = [
     { name = "google-cloud-bigquery-storage", specifier = ">=2.39.0" },
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "rich", specifier = ">=15.0.0" },
     { name = "typer", specifier = ">=0.26.8" },
 ]
 
