@@ -1,120 +1,148 @@
 import typer
+import csv
 import logging
-from src.config import configurar_logger, OUTPUT_DIR
+from rich.live import Live
+from src.config import configurar_logger, OUTPUT_DIR, GLOBAL_CONFIG
 from src.bigquery_client import BigQueryClient
 from src.token_manager import TokenManager
 from src.drive_client import DriveClient
+from src.ui import PipelineUI, console
 
 app = typer.Typer(help="Pipeline ETL para el Dashboard de Ventas por Asesor")
 logger = configurar_logger()
 
 @app.command()
 def update_data():
-    """Ejecuta el pipeline completo: Extrae (BQ), Transforma (JSON), Sube (Drive)."""
+    """Ejecuta el pipeline ETL: Extracción (BQ), Gestión de Tokens y Carga (Drive)."""
+    
+    ui = PipelineUI()
     logger.info("--- Iniciando proceso de actualización de datos ---")
     
-    # 1. Extracción
-    bq_client = BigQueryClient()
-    dataframes = bq_client.ejecutar_todas_consultas()
-    
-    if not dataframes:
-        logger.error("No se extrajeron datos. Abortando pipeline.")
-        raise typer.Exit(code=1)
+    with Live(ui.get_renderable(), console=console, refresh_per_second=4) as live:
         
-    df_desglosadas = dataframes.get('ventas_desglosadas')
-    
-    if df_desglosadas is None:
-         logger.error("Faltan las consultas requeridas en data/src.")
-         raise typer.Exit(code=1)
-
-    # 2. Transformación a JSON 
-    logger.info("Transformando datos a formato JSON...")
-    ruta_desglosadas = OUTPUT_DIR / "ventas_desglosadas.json"
-    
-    try:
-        df_desglosadas.to_json(ruta_desglosadas, orient="records", date_format="iso", force_ascii=False)
-        logger.info("✓ Archivos JSON generados correctamente.")
-    except Exception as e:
-        logger.error(f"✗ Error crítico al transformar los DataFrames a JSON: {str(e)}")
-        raise typer.Exit(code=1) 
-
-    # 3. Gestión de Tokens
-    logger.info("Gestionando tokens de asesores...")
-    try:
-        if 'Asesor' in df_desglosadas.columns:
-            asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
-            token_mgr = TokenManager(OUTPUT_DIR)
-            token_mgr.actualizar_tokens(asesores_unicos)
-            logger.info("✓ Tokens actualizados correctamente.")
-        else:
-            logger.warning("No se encontró la columna 'Asesor'. Se omitió la generación de tokens.")
-    except Exception as e:
-        logger.error(f"✗ Error al gestionar los tokens: {str(e)}")
-        raise typer.Exit(code=1)
-
-    # 4. Carga a Drive
-    logger.info("Subiendo archivos a Google Drive...")
-    try:
-        drive_client = DriveClient()
-        archivos_a_subir = [ruta_desglosadas, OUTPUT_DIR / "config.json"]
+        # --- 1. Extracción ---
+        ui.update_task(0, "[cyan]RUNNING[/]")
+        ui.log("Iniciando conexión a BigQuery...", "cyan")
+        live.update(ui.get_renderable())
         
-        hubo_alertas = False
-        for archivo in archivos_a_subir:
-            if archivo.exists():
-                exito = drive_client.subir_archivo(archivo)
-                if not exito:
-                    hubo_alertas = True
-                
-        if hubo_alertas:
-            logger.warning("--- Pipeline finalizada con algunas alertas (ver arriba) ---")
-        else:
-            logger.info("--- Pipeline finalizada con éxito ---")
+        try:
+            bq_client = BigQueryClient()
+            dataframes = bq_client.ejecutar_todas_consultas()
+            df_desglosadas = dataframes.get('ventas_desglosadas')
             
-    except Exception as e:
-        logger.error(f"✗ Error durante la conexión general a Drive: {str(e)}")
-        raise typer.Exit(code=1)
+            if df_desglosadas is None or df_desglosadas.empty:
+                raise ValueError("No se extrajeron datos de BigQuery.")
+            
+            ruta_desglosadas = OUTPUT_DIR / "ventas_desglosadas.json"
+            df_desglosadas.to_json(ruta_desglosadas, orient="records", date_format="iso", force_ascii=False)
+                
+            ui.log(f"Extracción y guardado local exitoso ({len(df_desglosadas)} filas).", "green")
+            ui.update_task(0, "[green]OK[/]")
+        except Exception as e:
+            ui.log(f"Error en Extracción/JSON: {str(e)}", "red")
+            ui.update_task(0, "[red]FAIL[/]")
+            logger.error(f"Fallo en BQ o JSON: {str(e)}")
+            return
+
+        # --- 2. Gestión de Tokens ---
+        ui.update_task(1, "[cyan]RUNNING[/]")
+        ui.log("Validando tokens de asesores...", "cyan")
+        live.update(ui.get_renderable())
+        
+        try:
+            if 'Asesor' in df_desglosadas.columns:
+                asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
+                token_mgr = TokenManager(OUTPUT_DIR)
+                
+                nuevos_asesores = token_mgr.actualizar_tokens(asesores_unicos)
+                
+                if nuevos_asesores:
+                    ui.log(f"Se crearon {len(nuevos_asesores)} tokens nuevos.", "yellow")
+                    ui.update_task(1, "[yellow]WARN[/]") 
+                else:
+                    ui.log("Tokens validados. No hay cambios.", "green")
+                    ui.update_task(1, "[green]OK[/]")
+            else:
+                ui.log("No se encontró columna 'Asesor'. Omitiendo.", "yellow")
+                ui.update_task(1, "[yellow]WARN[/]")
+        except Exception as e:
+            ui.log(f"Error gestionando Tokens: {str(e)}", "red")
+            ui.update_task(1, "[red]FAIL[/]")
+            logger.error(f"Fallo en Tokens: {str(e)}")
+            return
+
+        # --- 3. Carga a Drive ---
+        ui.update_task(2, "[cyan]RUNNING[/]")
+        ui.log("Conectando con Google Drive API...", "cyan")
+        live.update(ui.get_renderable())
+        
+        try:
+            drive_client = DriveClient()
+            archivos_a_subir = [ruta_desglosadas, OUTPUT_DIR / "config.json"]
+            
+            hubo_alertas = False
+            for archivo in archivos_a_subir:
+                if archivo.exists():
+                    exito = drive_client.subir_archivo(archivo)
+                    if not exito:
+                        hubo_alertas = True
+                        ui.log(f"Archivo '{archivo.name}' no encontrado en Drive.", "red")
+                    else:
+                        ui.log(f"Actualización de '{archivo.name}' exitosa.", "green")
+                        
+            if hubo_alertas:
+                ui.update_task(2, "[yellow]WARN[/]")
+                ui.log("Sube los archivos marcados en rojo manualmente por 1ra vez.", "yellow")
+            else:
+                ui.update_task(2, "[green]OK[/]")
+                ui.log("--- Pipeline finalizada con éxito ---", "bold green")
+                
+        except Exception as e:
+            ui.log(f"Error conectando a Drive: {str(e)}", "red")
+            ui.update_task(2, "[red]FAIL[/]")
+            logger.error(f"Fallo en Drive: {str(e)}")
+            return
+
+        live.update(ui.get_renderable())
 
 @app.command()
-def verify_tokens():
-    """
-    Solo ejecuta la revisión de la base de datos para crear tokens nuevos sin subir data de ventas.
-    """
-    logger.info("--- Iniciando verificación de tokens ---")
+def export_links():
+    """Genera un archivo CSV local con los asesores y sus tokens de acceso."""
+    
+    # Extraer la URL base (ahora traerá un valor de relleno si no está configurada)
+    base_url = GLOBAL_CONFIG.get("WEBAPP_BASE_URL")
+    
+    # Aviso amigable si detectamos que es la URL de relleno
+    if "URL_PENDIENTE" in base_url:
+        console.print("[yellow]Aviso: La variable WEBAPP_BASE_URL no está configurada en tu .env.[/]")
+        console.print("[yellow]Los links se generarán con una URL de relleno provisional.[/]\n")
+    
+    # Asegurarnos de que termine en token= 
+    if not base_url.endswith("token="):
+        base_url = base_url.rstrip("/") + "?token=" if "?" not in base_url else base_url + "&token="
+    
+    token_mgr = TokenManager(OUTPUT_DIR)
+    tokens_actuales = token_mgr.tokens
+    
+    if not tokens_actuales:
+        console.print("[red]No hay tokens registrados. Ejecuta 'update-data' primero.[/]")
+        return
+        
+    ruta_csv = OUTPUT_DIR / "links_asesores.csv"
     
     try:
-        bq_client = BigQueryClient()
-        dataframes = bq_client.ejecutar_todas_consultas()
-        df_desglosadas = dataframes.get('ventas_desglosadas')
+        with open(ruta_csv, mode="w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Asesor", "Link de Acceso"])
+            
+            for asesor, token in tokens_actuales.items():
+                link_completo = f"{base_url}{token}"
+                writer.writerow([asesor, link_completo])
+                
+        console.print(f"[bold green]✓ CSV generado exitosamente en: {ruta_csv}[/]")
         
-        if df_desglosadas is None:
-             logger.error("Falta la consulta de ventas_desglosadas en data/src.")
-             raise typer.Exit(code=1)
-
-        logger.info("Revisando nuevos asesores para generación de tokens...")
-        if 'Asesor' in df_desglosadas.columns:
-            asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
-            token_mgr = TokenManager(OUTPUT_DIR)
-            
-            hubo_cambios = token_mgr.actualizar_tokens(asesores_unicos)
-            
-            if hubo_cambios:
-                logger.info("Se detectaron nuevos asesores. Subiendo config.json a Drive...")
-                drive_client = DriveClient()
-                ruta_config = OUTPUT_DIR / "config.json"
-                
-                if ruta_config.exists():
-                    drive_client.subir_archivo(ruta_config)
-            else:
-                logger.info("No hubo cambios en los tokens. No se requiere actualización en Drive.")
-                
-        else:
-            logger.warning("No se encontró la columna 'Asesor' en la base de datos. Se omitió la validación.")
-
-        logger.info("--- Verificación de tokens finalizada ---")
-
     except Exception as e:
-        logger.error(f"✗ Error crítico durante la verificación de tokens: {str(e)}")
-        raise typer.Exit(code=1)
+        console.print(f"[bold red]✗ Error al generar el CSV: {str(e)}[/]")
 
 if __name__ == "__main__":
     app()

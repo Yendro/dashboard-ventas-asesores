@@ -47,6 +47,12 @@ for var in VARIABLES_REQUERIDAS:
 
     GLOBAL_CONFIG[var] = valor
 
+# Configuración global opcional
+GLOBAL_CONFIG["WEBAPP_BASE_URL"] = os.getenv(
+    "WEBAPP_BASE_URL", 
+    "https://script.google.com/macros/s/URL_PENDIENTE_DE_DEPLOY/exec?token="
+)
+
 
 def configurar_logger() -> logging.Logger:
     """
@@ -73,18 +79,8 @@ def configurar_logger() -> logging.Logger:
         )
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
-
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setLevel(logging.INFO)
-        stream_handler.setFormatter(formatter)
-
         logger.addHandler(file_handler)
-        logger.addHandler(stream_handler)
 
         # Bandera personalizada para no duplicar handlers.
         logger._logger_configurado = True  # type: ignore[attr-defined]
-
-        logger.info("Inicio de ejecución")
-        logger.info("Archivo de log: %s", LOG_FILE)
-
     return logger
