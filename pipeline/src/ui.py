@@ -1,66 +1,93 @@
-from rich.layout import Layout
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from rich.console import Console
 
+# Instancia global de la consola para imprimir elementos enriquecidos
 console = Console()
 
 class PipelineUI:
     """
-    Clase encargada de construir y actualizar la interfaz gráfica en la terminal
-    utilizando la librería 'rich'.
+    Controla la interfaz gráfica en la terminal durante la ejecución del pipeline.
+    Utiliza un diseño de dos columnas:
+      - Izquierda: Estado actual de cada módulo (OK, RUNNING, FAIL).
+      - Derecha: Registro en vivo de los eventos y errores (Logs).
     """
     def __init__(self):
-        # Definimos los módulos estáticos de la pipeline.
-        # Esto sirve como el "esqueleto" de la tabla izquierda.
+        # Módulos fijos que componen la tabla de la izquierda.
         self.tasks = [
             {"id": "01", "mod": "bigquery_client.py", "status": "[dim]WAIT[/]"},
             {"id": "02", "mod": "token_manager.py", "status": "[dim]WAIT[/]"},
             {"id": "03", "mod": "drive_client.py", "status": "[dim]WAIT[/]"}
         ]
         
-        # Lista para almacenar el historial de mensajes (logs) en tiempo real.
+        # Almacena el historial de logs para mostrarlos en el panel derecho.
         self.logs = []
 
     def update_task(self, idx: int, status: str):
-        """ Actualiza el estado visual de un módulo en la tabla. """
+        """
+        Actualiza el estado de un módulo en la tabla visual.
+        
+        Args:
+            idx (int): Índice del módulo (0: BQ, 1: Tokens, 2: Drive).
+            status (str): Etiqueta con formato Rich (ej. "[green]OK[/]").
+        """
         self.tasks[idx]["status"] = status
 
     def log(self, message: str, style="white"):
-        """ Agrega un nuevo mensaje al panel de logs de la derecha. """
+        """
+        Inyecta un nuevo mensaje en el panel de logs.
+        Mantiene un límite estricto de mensajes para evitar que la interfaz
+        crezca verticalmente y empuje la línea de comandos hacia abajo.
+        
+        Args:
+            message (str): El texto del evento a registrar.
+            style (str): El color o estilo del texto (ej. "red", "bold green").
+        """
         self.logs.append(f"[{style}]{message}[/]")
-        if len(self.logs) > 12:  # Limite de mensajes
+        if len(self.logs) > 13:
             self.logs.pop(0)
 
     def get_renderable(self):
         """
-        Construye el 'Layout' maestro que divide la pantalla en dos columnas.
-        Este método es llamado continuamente por Live() para refrescar la pantalla.
+        Ensambla y retorna el componente visual completo.
+        Se utiliza Table.grid() en lugar de Layout() para garantizar que la
+        interfaz solo ocupe el alto estrictamente necesario, evitando saltos
+        de línea masivos al finalizar el script.
         """
-        # --- 1. Tabla de Tareas (Panel Izquierdo) ---
-        table = Table(box=None, expand=True)
-        table.add_column("id", style="bold yellow", width=4)
-        table.add_column("module", style="bold white")
-        table.add_column("status", justify="right", width=10)
+        # --- 1. Panel Izquierdo: Tabla de Estatus ---
+        # Se remueven los bordes internos para un look más limpio.
+        status_table = Table(box=None, expand=True)
+        status_table.add_column("id", style="bold yellow", width=4)
+        status_table.add_column("module", style="bold white")
+        status_table.add_column("status", justify="right", width=10)
         
         for task in self.tasks:
-            table.add_row(task["id"], task["mod"], task["status"])
+            status_table.add_row(task["id"], task["mod"], task["status"])
             
-        # Envolvemos la tabla en un panel con bordes cyan
-        panel_table = Panel(table, title="[bold cyan]Pipeline status[/]", border_style="cyan", height=16)
+        panel_status = Panel(
+            status_table, 
+            title="[bold cyan]Pipeline status[/]", 
+            border_style="cyan", 
+            height=15
+        )
 
-        # --- 2. Historial de Logs (Panel Derecho) ---
+        # --- 2. Panel Derecho: Historial de Logs ---
         log_text = Text.from_markup("\n".join(self.logs))
         
-        # Envolvemos los textos en un panel.
-        panel_logs = Panel(log_text, title="[bold cyan]Execution Logs[/]", border_style="cyan", height=16)
-
-        # --- 3. Unión de Paneles ---
-        layout = Layout()
-        layout.split_row(
-            Layout(panel_table, name="left", ratio=1),
-            Layout(panel_logs, name="right", ratio=2)
+        panel_logs = Panel(
+            log_text, 
+            title="[bold cyan]Execution Logs[/]", 
+            border_style="cyan", 
+            height=15
         )
+
+        # --- 3. Grid invisible de 2 columnas sin forzar a la terminal a expandirse verticalmente.
+        master_grid = Table.grid(expand=True)
+        master_grid.add_column(ratio=1) # Columna izquierda (1 tercio)
+        master_grid.add_column(ratio=2) # Columna derecha (2 tercios)
         
-        return layout
+        # Insertamos ambos paneles en una sola fila
+        master_grid.add_row(panel_status, panel_logs)
+        
+        return master_grid
