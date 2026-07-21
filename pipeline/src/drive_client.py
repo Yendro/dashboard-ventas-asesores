@@ -1,8 +1,9 @@
+import io
 import logging
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from src.config import GLOBAL_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,30 @@ class DriveClient:
         )
         archivos = resultados.get('files', [])
         return archivos[0]['id'] if archivos else None
+    
+    def descargar_archivo(self, nombre_archivo: str, ruta_destino: Path) -> bool:
+        """
+        Descarga un archivo desde Drive y lo guarda localmente.
+        Retorna True si fue exitoso, False si no existe en Drive.
+        """
+        try:
+            archivo_id = self._buscar_archivo(nombre_archivo)
+            
+            if not archivo_id:
+                return False
+
+            request = self.service.files().get_media(fileId=archivo_id)
+            fh = io.FileIO(ruta_destino, 'wb')
+            downloader = MediaIoBaseDownload(fh, request)
+            
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                
+            return True
+        except Exception as e:
+            logger.error(f"Error descargando {nombre_archivo}: {e}")
+            return False
 
     def subir_archivo(self, ruta_archivo: Path) -> bool:
         """

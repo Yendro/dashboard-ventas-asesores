@@ -20,7 +20,7 @@ def update_data():
     
     with Live(ui.get_renderable(), console=console, refresh_per_second=4) as live:
         
-        # --- 1. Extracción ---
+        # 1. Extracción
         ui.update_task(0, "[cyan]RUNNING[/]")
         ui.log("Iniciando conexión a BigQuery...", "cyan")
         live.update(ui.get_renderable())
@@ -44,12 +44,21 @@ def update_data():
             logger.error(f"Fallo en BQ o JSON: {str(e)}")
             return
 
-        # --- 2. Gestión de Tokens ---
+        # 2. Gestión de Tokens
         ui.update_task(1, "[cyan]RUNNING[/]")
-        ui.log("Validando tokens de asesores...", "cyan")
+        ui.log("Sincronizando y validando tokens...", "cyan")
         live.update(ui.get_renderable())
         
         try:
+            # Intentar descargar config.json de Drive antes de hacer nada
+            drive_client = DriveClient()
+            ruta_config = OUTPUT_DIR / "config.json"
+            
+            if drive_client.descargar_archivo("config.json", ruta_config):
+                ui.log("Base de tokens sincronizada desde Drive.", "green")
+            else:
+                ui.log("No hay tokens en Drive. Se generará base local.", "yellow")
+
             if 'Asesor' in df_desglosadas.columns:
                 asesores_unicos = df_desglosadas['Asesor'].dropna().unique().tolist()
                 token_mgr = TokenManager(OUTPUT_DIR)
@@ -69,9 +78,8 @@ def update_data():
             ui.log(f"Error gestionando Tokens: {str(e)}", "red")
             ui.update_task(1, "[red]FAIL[/]")
             logger.error(f"Fallo en Tokens: {str(e)}")
-            return
 
-        # --- 3. Carga a Drive ---
+        # 3. Carga a Drive
         ui.update_task(2, "[cyan]RUNNING[/]")
         ui.log("Conectando con Google Drive API...", "cyan")
         live.update(ui.get_renderable())
@@ -106,13 +114,30 @@ def update_data():
         live.update(ui.get_renderable())
 
 @app.command()
+def init():
+    """Descarga los archivos de Google Drive para preparar un entorno local nuevo."""
+    console.print("\n[bold cyan]Sincronizando entorno local con Google Drive...[/]")
+    try:
+        drive_client = DriveClient()
+        archivos = ["config.json", "ventas_desglosadas.json"]
+        
+        for archivo in archivos:
+            ruta = OUTPUT_DIR / archivo
+            if drive_client.descargar_archivo(archivo, ruta):
+                console.print(f"[green]✓ {archivo} descargado exitosamente.[/]")
+            else:
+                console.print(f"[yellow]⚠️ {archivo} no existe en Drive aún.[/]")
+                
+        console.print("[bold green]\nEntorno inicializado correctamente.[/]")
+    except Exception as e:
+        console.print(f"[bold red]✗ Error inicializando el entorno: {str(e)}[/]")
+
+@app.command()
 def export_links():
     """Genera un archivo CSV local con los asesores y sus tokens de acceso."""
     
-    # Extraer la URL base (ahora traerá un valor de relleno si no está configurada)
+    # Extraer la URL base (traerá un valor de relleno si no está configurada)
     base_url = GLOBAL_CONFIG.get("WEBAPP_BASE_URL")
-    
-    # Aviso amigable si detectamos que es la URL de relleno
     if "URL_PENDIENTE" in base_url:
         console.print("[yellow]Aviso: La variable WEBAPP_BASE_URL no está configurada en tu .env.[/]")
         console.print("[yellow]Los links se generarán con una URL de relleno provisional.[/]\n")
